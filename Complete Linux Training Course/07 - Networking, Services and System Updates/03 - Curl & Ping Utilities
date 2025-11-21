@@ -1,0 +1,1084 @@
+# curl and ping Commands - Complete Guide
+
+## Table of Contents
+1. [curl Command](#curl-command)
+2. [ping Command](#ping-command)
+3. [Daily Use Cases](#daily-use-cases)
+4. [Real-Life Examples](#real-life-examples)
+
+---
+
+## 1. curl Command
+
+### What is curl?
+- **curl** stands for "Client URL"
+- A command-line tool for transferring data using various network protocols
+- Supports HTTP, HTTPS, FTP, FTPS, SCP, SFTP, TFTP, DICT, TELNET, LDAP, and more
+- Linux equivalent of opening a URL in a web browser
+- Used for downloading files, testing APIs, and debugging web services
+
+### Basic Syntax
+curl [options] [URL]
+
+### Common curl Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| -O | Save file with original filename | curl -O http://example.com/file.txt |
+| -o | Save file with custom filename | curl -o myfile.txt http://example.com/file.txt |
+| -I | Fetch headers only | curl -I http://example.com |
+| -L | Follow redirects | curl -L http://example.com |
+| -X | Specify HTTP method | curl -X POST http://api.example.com |
+| -H | Add custom header | curl -H "Content-Type: application/json" |
+| -d | Send data in POST request | curl -d "param=value" http://api.example.com |
+| -u | Basic authentication | curl -u username:password http://example.com |
+| -v | Verbose mode (show details) | curl -v http://example.com |
+| -s | Silent mode (no progress bar) | curl -s http://example.com |
+| -k | Ignore SSL certificate errors | curl -k https://example.com |
+| -A | Set User-Agent | curl -A "Mozilla/5.0" http://example.com |
+| -b | Send cookies | curl -b "session=abc123" http://example.com |
+| -c | Save cookies to file | curl -c cookies.txt http://example.com |
+
+### curl Examples
+
+#### Example 1: Simple GET Request
+# View website content in terminal
+curl http://www.google.com
+# Output: HTML content of Google homepage
+
+#### Example 2: Download File with Original Name
+# Download file and save with original filename
+curl -O https://example.com/downloads/file.pdf
+# File saved as: file.pdf
+
+#### Example 3: Download File with Custom Name
+# Download and save with custom filename
+curl -o my_document.pdf https://example.com/downloads/file.pdf
+# File saved as: my_document.pdf
+
+#### Example 4: Check HTTP Headers
+# View response headers
+curl -I https://www.google.com
+# Output:
+# HTTP/2 200
+# content-type: text/html; charset=ISO-8859-1
+# date: Fri, 21 Nov 2025 10:30:00 GMT
+# server: gws
+
+#### Example 5: Test REST API (GET)
+# Fetch data from API
+curl https://jsonplaceholder.typicode.com/posts/1
+# Output: JSON response
+# {
+#   "userId": 1,
+#   "id": 1,
+#   "title": "sunt aut facere...",
+#   "body": "quia et suscipit..."
+# }
+
+#### Example 6: Test REST API (POST)
+# Send POST request with JSON data
+curl -X POST https://jsonplaceholder.typicode.com/posts \
+  -H "Content-Type: application/json" \
+  -d '{"title":"foo","body":"bar","userId":1}'
+# Output: Created resource with ID
+
+#### Example 7: Authentication
+# Basic authentication
+curl -u username:password https://api.example.com/data
+# Or use token
+curl -H "Authorization: Bearer YOUR_TOKEN" https://api.example.com/data
+
+#### Example 8: Follow Redirects
+# Follow HTTP redirects automatically
+curl -L http://bit.ly/shortened-url
+# Without -L, you'll only see the redirect response
+
+#### Example 9: Download Multiple Files
+# Download multiple files at once
+curl -O https://example.com/file1.txt -O https://example.com/file2.txt
+
+#### Example 10: Save Response with Verbose Output
+# See detailed connection info
+curl -v https://api.github.com
+# Shows: DNS lookup, TCP connection, TLS handshake, HTTP headers
+
+#### Example 11: Check Website Response Time
+# Measure response time
+curl -o /dev/null -s -w "Time: %{time_total}s\n" https://www.google.com
+# Output: Time: 0.234s
+
+#### Example 12: Send Form Data
+# Send form data (like HTML form submission)
+curl -X POST https://example.com/login \
+  -d "username=admin" \
+  -d "password=secret123"
+
+---
+
+## 2. ping Command
+
+### What is ping?
+- **ping** stands for "Packet Internet Groper"
+- Tests connectivity between your computer and a target host
+- Sends ICMP (Internet Control Message Protocol) echo request packets
+- Measures round-trip time (RTT) and packet loss
+- Used for network troubleshooting and diagnostics
+
+### Basic Syntax
+ping [options] destination
+
+### How ping Works
+1. Your computer sends an ICMP Echo Request packet to the target
+2. Target receives the packet and sends back an ICMP Echo Reply
+3. Your computer measures the time taken (round-trip time)
+4. Process repeats continuously until stopped (Ctrl+C)
+
+### ping Output Explained
+64 bytes from 142.250.185.46: icmp_seq=1 ttl=117 time=12.3 ms
+
+- 64 bytes: Size of the packet
+- from 142.250.185.46: IP address of the responding host
+- icmp_seq=1: Sequence number of the packet
+- ttl=117: Time To Live (number of network hops remaining)
+- time=12.3 ms: Round-trip time in milliseconds
+
+### Common ping Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| -c | Count (number of packets to send) | ping -c 5 google.com |
+| -i | Interval between packets (seconds) | ping -i 2 google.com |
+| -s | Packet size in bytes | ping -s 1000 google.com |
+| -t | Set TTL value | ping -t 64 google.com |
+| -W | Timeout in seconds | ping -W 5 google.com |
+| -q | Quiet mode (summary only) | ping -q -c 10 google.com |
+| -f | Flood ping (fast, requires root) | sudo ping -f google.com |
+| -4 | Force IPv4 | ping -4 google.com |
+| -6 | Force IPv6 | ping -6 google.com |
+
+### ping Examples
+
+#### Example 1: Basic Ping
+# Ping Google (press Ctrl+C to stop)
+ping www.google.com
+
+# Output:
+# PING www.google.com (142.250.185.46) 56(84) bytes of data.
+# 64 bytes from lhr25s34-in-f14.1e100.net (142.250.185.46): icmp_seq=1 ttl=117 time=12.3 ms
+# 64 bytes from lhr25s34-in-f14.1e100.net (142.250.185.46): icmp_seq=2 ttl=117 time=11.8 ms
+# 64 bytes from lhr25s34-in-f14.1e100.net (142.250.185.46): icmp_seq=3 ttl=117 time=12.1 ms
+
+#### Example 2: Ping with Count
+# Send exactly 5 packets
+ping -c 5 www.google.com
+
+# Output shows 5 pings then stops automatically with statistics:
+# --- www.google.com ping statistics ---
+# 5 packets transmitted, 5 received, 0% packet loss, time 4006ms
+# rtt min/avg/max/mdev = 11.823/12.045/12.334/0.189 ms
+
+#### Example 3: Ping IP Address
+# Ping by IP address directly
+ping 8.8.8.8
+
+# This pings Google's DNS server
+
+#### Example 4: Ping with Custom Interval
+# Ping every 2 seconds
+ping -i 2 -c 5 google.com
+
+# Useful for monitoring without flooding
+
+#### Example 5: Ping with Larger Packet Size
+# Send 1000-byte packets
+ping -s 1000 -c 5 google.com
+
+# Tests network with larger payloads
+
+#### Example 6: Quiet Mode (Summary Only)
+# Show only final statistics
+ping -q -c 100 google.com
+
+# Output:
+# PING google.com (142.250.185.46) 56(84) bytes of data.
+# --- google.com ping statistics ---
+# 100 packets transmitted, 100 received, 0% packet loss, time 99123ms
+# rtt min/avg/max/mdev = 11.234/12.456/15.789/0.987 ms
+
+#### Example 7: Continuous Monitoring
+# Monitor network continuously
+ping google.com > ping_log.txt
+
+# Runs in background, logs to file
+# Stop with Ctrl+C
+
+#### Example 8: Ping Local Network Device
+# Ping your router/gateway
+ping 192.168.1.1
+
+# Or ping another computer on your network
+ping 192.168.1.100
+
+#### Example 9: Check If Host Is Up
+# Quick check (send 1 packet)
+ping -c 1 192.168.1.50
+
+# If no response: host is down or blocking ping
+# If response: host is up and reachable
+
+#### Example 10: Ping with Timestamp
+# Add timestamp to each ping
+ping google.com | while read line; do echo "$(date '+%Y-%m-%d %H:%M:%S') - $line"; done
+
+# Output:
+# 2025-11-21 10:30:15 - 64 bytes from lhr25s34-in-f14.1e100.net: icmp_seq=1 ttl=117 time=12.3 ms
+
+---
+
+## 3. Daily Use Cases
+
+### curl Daily Use Cases
+
+#### Use Case 1: DevOps - Health Check Monitoring
+Scenario: You need to monitor if your web application is running
+
+# Check if application responds with 200 OK
+curl -I http://your-app.com/health
+
+# Automated health check script
+if curl -s --head http://your-app.com/health | grep "200 OK" > /dev/null; then
+  echo "Application is healthy"
+else
+  echo "Application is down! Alert sent."
+fi
+
+Real-Life Example:
+- Morning routine: Check all production services
+- Automated cron job runs every 5 minutes
+- If any service fails, sends alert to Slack/Email
+
+#### Use Case 2: API Development & Testing
+Scenario: You're developing a REST API and need to test endpoints
+
+# Test GET endpoint
+curl https://api.yourapp.com/users/123
+
+# Test POST endpoint (create user)
+curl -X POST https://api.yourapp.com/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John","email":"john@example.com"}'
+
+# Test with authentication
+curl -H "Authorization: Bearer YOUR_TOKEN" \
+  https://api.yourapp.com/protected-resource
+
+Real-Life Example:
+- Backend developer testing new API before frontend integration
+- QA engineer verifying API behavior
+- Debugging production API issues without GUI tools
+
+#### Use Case 3: Downloading Files from Web
+Scenario: Download configuration files, updates, or backups
+
+# Download latest configuration
+curl -O https://config-server.com/app-config.json
+
+# Download with progress bar
+curl -# -O https://example.com/large-file.zip
+
+# Download and extract in one command
+curl https://example.com/archive.tar.gz | tar xz
+
+Real-Life Example:
+- System administrator downloading security patches
+- Developer fetching latest dependencies
+- Automated backup script downloading files from remote server
+
+#### Use Case 4: Webhook Testing
+Scenario: Test webhook integrations (GitHub, Stripe, etc.)
+
+# Send test webhook payload
+curl -X POST https://your-app.com/webhooks/github \
+  -H "Content-Type: application/json" \
+  -H "X-GitHub-Event: push" \
+  -d '{"ref":"refs/heads/main","commits":[...]}'
+
+Real-Life Example:
+- Testing GitHub webhook before going live
+- Simulating payment notifications from Stripe
+- Debugging webhook authentication issues
+
+#### Use Case 5: Web Scraping & Data Collection
+Scenario: Extract data from websites or APIs
+
+# Fetch weather data
+curl "https://api.openweathermap.org/data/2.5/weather?q=London&appid=YOUR_API_KEY"
+
+# Scrape specific data with jq (JSON processor)
+curl -s https://api.github.com/users/torvalds | jq '.name, .bio'
+
+Real-Life Example:
+- Daily script to fetch stock prices
+- Monitoring competitor website changes
+- Collecting metrics from multiple services
+
+#### Use Case 6: File Upload
+Scenario: Upload files to server or cloud storage
+
+# Upload file via POST
+curl -X POST -F "file=@/path/to/document.pdf" https://upload.example.com
+
+# Upload image to API
+curl -X POST -F "image=@photo.jpg" -F "caption=My Photo" \
+  https://api.example.com/upload
+
+Real-Life Example:
+- Automated backup uploads to cloud storage
+- CI/CD pipeline uploading build artifacts
+- Bulk uploading images to CMS
+
+#### Use Case 7: SSL/TLS Certificate Checking
+Scenario: Verify SSL certificate validity and details
+
+# Check certificate expiry
+curl -vI https://your-website.com 2>&1 | grep -i "expire"
+
+# Get full certificate details
+curl -vI https://your-website.com 2>&1 | grep -A 10 "SSL certificate"
+
+Real-Life Example:
+- Monthly SSL certificate expiry check
+- Debugging SSL handshake failures
+- Verifying new certificate installation
+
+#### Use Case 8: Testing Load Balancers
+Scenario: Check if load balancer distributes traffic correctly
+
+# See which backend server responds
+for i in {1..10}; do
+  curl -s http://load-balancer.com | grep "Server-ID"
+done
+
+Real-Life Example:
+- Verify load balancer configuration
+- Test server failover behavior
+- Check session persistence (sticky sessions)
+
+### ping Daily Use Cases
+
+#### Use Case 1: Network Troubleshooting
+Scenario: Internet is slow or not working
+
+Step 1: Check local network
+ping 192.168.1.1  # Your router
+
+Step 2: Check ISP connection
+ping 8.8.8.8  # Google DNS
+
+Step 3: Check DNS resolution
+ping www.google.com  # Domain name
+
+Diagnosis:
+- If router fails: Local network issue (cable, WiFi)
+- If 8.8.8.8 fails: ISP/Internet connection problem
+- If google.com fails but 8.8.8.8 works: DNS issue
+
+Real-Life Example:
+- User complains "internet is down"
+- You ping to identify exact problem layer
+- Fix specific issue (restart router, call ISP, fix DNS)
+
+#### Use Case 2: Server Availability Monitoring
+Scenario: Monitor if critical servers are reachable
+
+# Monitor production server
+ping -c 1 production-server.com && echo "UP" || echo "DOWN"
+
+# Continuous monitoring with alerts
+while true; do
+  if ! ping -c 1 production-server.com > /dev/null 2>&1; then
+    echo "ALERT: Server is DOWN!" | mail -s "Server Alert" admin@company.com
+  fi
+  sleep 60  # Check every minute
+done
+
+Real-Life Example:
+- 24/7 monitoring of web servers
+- Database server availability checks
+- Early warning system before users complain
+
+#### Use Case 3: Network Performance Testing
+Scenario: Check network latency and packet loss
+
+# Test network quality
+ping -c 100 google.com
+
+# Analyze results:
+# - min/avg/max: Latency consistency
+# - packet loss: Network stability
+# - mdev (standard deviation): Jitter
+
+Interpretation:
+- 0-20ms: Excellent (gaming, VoIP)
+- 20-50ms: Good (general browsing)
+- 50-100ms: Acceptable (slower response)
+- 100ms+: Poor (laggy experience)
+- Packet loss >1%: Network issues
+
+Real-Life Example:
+- Before video conference: check connection quality
+- Gaming performance issues: ping game server
+- VPN performance testing
+
+#### Use Case 4: Verify New Server Deployment
+Scenario: Just deployed new server, verify it's accessible
+
+# Check if server responds
+ping new-server.company.com
+
+# Check from multiple locations (if you have access)
+ping new-server.company.com  # From office
+ssh remote-location "ping -c 5 new-server.company.com"  # From data center
+
+Real-Life Example:
+- After DNS changes, verify propagation
+- Post-deployment smoke test
+- Firewall rule verification
+
+#### Use Case 5: Troubleshoot Remote Office Connectivity
+Scenario: Branch office can't access headquarters
+
+# From branch office, test connectivity
+ping headquarters-server.company.com
+
+# Check intermediate hops
+traceroute headquarters-server.company.com
+
+# If ping fails but traceroute shows path:
+# - ICMP might be blocked by firewall
+# - Server might be blocking ping
+# - Try other tests (telnet, curl)
+
+Real-Life Example:
+- VPN tunnel verification
+- WAN link troubleshooting
+- Site-to-site connectivity issues
+
+#### Use Case 6: Check DNS Server Response
+Scenario: Verify DNS servers are working
+
+# Primary DNS
+ping 8.8.8.8  # Google DNS
+
+# Secondary DNS
+ping 1.1.1.1  # Cloudflare DNS
+
+# Company DNS
+ping 192.168.1.10  # Internal DNS server
+
+Real-Life Example:
+- DNS resolution failures
+- Compare internal vs external DNS performance
+- Switching to faster DNS server
+
+#### Use Case 7: IoT Device Connectivity
+Scenario: Check if IoT devices are online
+
+# Ping smart devices
+ping 192.168.1.150  # Smart TV
+ping 192.168.1.151  # Security Camera
+ping 192.168.1.152  # Smart Thermostat
+
+# Automated device discovery
+for ip in 192.168.1.{1..254}; do
+  ping -c 1 -W 1 $ip > /dev/null 2>&1 && echo "$ip is UP"
+done
+
+Real-Life Example:
+- Home automation troubleshooting
+- IP camera offline issues
+- Network device inventory
+
+#### Use Case 8: Pre-Deployment Network Test
+Scenario: Before deploying application, test network path
+
+# Test connectivity to all dependencies
+ping -c 5 database-server.com
+ping -c 5 redis-cache.com
+ping -c 5 api.thirdparty.com
+ping -c 5 cdn.cloudfront.net
+
+# Document baseline performance
+ping -c 100 critical-service.com > baseline.txt
+
+Real-Life Example:
+- Pre-launch checklist for new application
+- Verify all external dependencies reachable
+- Establish performance baseline for comparison
+
+---
+
+## 4. Real-Life Examples & Scenarios
+
+### Scenario 1: "Website is down!" - Complete Troubleshooting
+
+Problem: User reports "I can't access our company website!"
+
+Step-by-step troubleshooting:
+
+# Step 1: Check if site is actually down
+curl -I https://company-website.com
+# If fails: Continue investigation
+# If works: User-specific issue
+
+# Step 2: Check from different location (use online tools or curl with proxy)
+curl -I https://company-website.com --proxy alternative-proxy:8080
+
+# Step 3: Check DNS resolution
+ping company-website.com
+# Note the IP address returned
+
+# Step 4: Check if IP is reachable
+ping <IP_ADDRESS_FROM_STEP_3>
+
+# Step 5: Check specific services
+curl -I http://company-website.com  # HTTP
+curl -I https://company-website.com # HTTPS
+
+# Step 6: Check with verbose output
+curl -v https://company-website.com
+
+Possible outcomes:
+1. curl works but user can't access: User's firewall/proxy issue
+2. ping works but curl fails: Web server down, application crash
+3. ping fails: Network/server completely down
+4. DNS resolution fails: DNS server issue or domain expired
+
+### Scenario 2: API Integration Not Working
+
+Problem: Frontend can't connect to backend API
+
+# Test 1: Basic connectivity
+ping api.backend.com
+# Result: Success - network is fine
+
+# Test 2: Check API endpoint
+curl https://api.backend.com/health
+# Result: Timeout - API not responding
+
+# Test 3: Check HTTP vs HTTPS
+curl http://api.backend.com/health
+# Result: Success - SSL/TLS issue!
+
+# Test 4: Check certificate
+curl -vI https://api.backend.com/health 2>&1 | grep -i certificate
+# Result: Certificate expired
+
+Solution: Renew SSL certificate
+
+### Scenario 3: Slow Application Performance
+
+Problem: Users complain application is slow
+
+# Test 1: Measure response time
+curl -o /dev/null -s -w "Connect: %{time_connect}s\nStart Transfer: %{time_starttransfer}s\nTotal: %{time_total}s\n" https://your-app.com
+
+# Output:
+# Connect: 0.234s          # Network connection time
+# Start Transfer: 2.456s   # Time to first byte (backend processing)
+# Total: 3.678s            # Complete download time
+
+# Test 2: Check network latency
+ping -c 50 your-app.com
+# High average latency? Network issue
+# High packet loss? Network instability
+
+# Test 3: Compare different endpoints
+curl -w "@curl-format.txt" -o /dev/null -s https://your-app.com/fast-endpoint
+curl -w "@curl-format.txt" -o /dev/null -s https://your-app.com/slow-endpoint
+
+# curl-format.txt contains:
+# time_total: %{time_total}s
+# time_connect: %{time_connect}s
+# time_appconnect: %{time_appconnect}s
+# time_starttransfer: %{time_starttransfer}s
+
+Analysis:
+- High connect time: Network/DNS issue
+- High starttransfer time: Backend processing slow
+- High total but low starttransfer: Large response size
+
+### Scenario 4: CI/CD Pipeline Debugging
+
+Problem: Deployment script fails when downloading artifacts
+
+Current failing script:
+curl -O https://artifacts.company.com/app-v1.2.3.tar.gz
+# Error: SSL certificate problem
+
+# Debug 1: Check certificate validity
+curl -vI https://artifacts.company.com 2>&1 | grep -i cert
+
+# Debug 2: Bypass SSL (temporary, for testing only)
+curl -k -O https://artifacts.company.com/app-v1.2.3.tar.gz
+# Success! Confirms it's SSL issue
+
+# Debug 3: Check certificate chain
+openssl s_client -connect artifacts.company.com:443 -showcerts
+
+# Debug 4: Update CA certificates (proper fix)
+sudo update-ca-certificates
+
+# Final working script:
+curl -f -O https://artifacts.company.com/app-v1.2.3.tar.gz || {
+  echo "Download failed!" >&2
+  exit 1
+}
+
+### Scenario 5: Microservices Communication Issues
+
+Problem: Service A can't communicate with Service B
+
+# From Service A container/server:
+
+# Test 1: Check if Service B is reachable
+ping service-b.internal
+
+# Test 2: Check specific port (using curl as telnet alternative)
+curl -v telnet://service-b.internal:8080
+# Or
+curl http://service-b.internal:8080/health
+
+# Test 3: Check with different protocols
+curl http://service-b.internal:8080/health   # HTTP
+curl https://service-b.internal:8443/health  # HTTPS
+
+# Test 4: Check from different service
+# SSH to Service C and test
+ssh service-c.internal
+curl http://service-b.internal:8080/health
+
+# Test 5: Check DNS resolution
+nslookup service-b.internal
+ping service-b.internal
+
+Results analysis:
+- Ping fails: DNS or network issue
+- Ping works but curl fails: Service B down or port blocked
+- Works from Service C but not A: Firewall rule specific to Service A
+
+### Scenario 6: Load Balancer Configuration Testing
+
+Problem: Need to verify load balancer distributes requests evenly
+
+# Test script to check distribution
+for i in {1..20}; do
+  curl -s http://load-balancer.com | grep "Server-ID" | cut -d':' -f2
+done | sort | uniq -c
+
+# Expected output (even distribution):
+#   10 server-1
+#   10 server-2
+
+# If you see:
+#   20 server-1
+#    0 server-2
+# Then server-2 is not receiving traffic (check backend health)
+
+# Test with sticky sessions (session persistence)
+COOKIE=$(curl -c - http://load-balancer.com/login | grep sessionid | awk '{print $7}')
+for i in {1..10}; do
+  curl -b "sessionid=$COOKIE" -s http://load-balancer.com | grep "Server-ID"
+done
+# Should always show same server ID
+
+### Scenario 7: Geographic Performance Testing
+
+Problem: Users in Asia report slow performance, US users are fine
+
+# Test from US location:
+time curl -s https://your-app.com > /dev/null
+# Result: 0.5 seconds
+
+# Test from Asia location (using VPS or proxy):
+ssh asia-server "time curl -s https://your-app.com > /dev/null"
+# Result: 3.5 seconds
+
+# Detailed analysis:
+curl -w "@timing.txt" -o /dev/null -s https://your-app.com
+
+# timing.txt:
+# time_namelookup: %{time_namelookup}s
+# time_connect: %{time_connect}s
+# time_appconnect: %{time_appconnect}s
+# time_pretransfer: %{time_pretransfer}s
+# time_redirect: %{time_redirect}s
+# time_starttransfer: %{time_starttransfer}s
+# time_total: %{time_total}s
+
+Solutions based on results:
+- High namelookup: DNS resolution slow (use GeoDNS)
+- High connect: Long distance (deploy CDN or regional servers)
+- High starttransfer: Backend processing slow (optimize application)
+
+### Scenario 8: Security Audit - Open Port Scanning
+
+Problem: Security audit requires checking which services are accessible
+
+# Method 1: Using ping to check if host is up
+ping -c 1 target-server.com && echo "Host is up"
+
+# Method 2: Using curl to check specific services
+curl -v --connect-timeout 5 http://target-server.com:80     # HTTP
+curl -v --connect-timeout 5 https://target-server.com:443   # HTTPS
+curl -v --connect-timeout 5 telnet://target-server.com:22   # SSH
+curl -v --connect-timeout 5 telnet://target-server.com:3306 # MySQL
+
+# Method 3: Automated scanning script
+ports=(80 443 22 3306 5432 6379 27017)
+for port in "${ports[@]}"; do
+  echo -n "Port $port: "
+  curl -v --connect-timeout 2 telnet://target-server.com:$port 2>&1 | grep -q "Connected" && echo "OPEN" || echo "CLOSED"
+done
+
+Expected results (secure server):
+Port 80: OPEN    # HTTP (should redirect to HTTPS)
+Port 443: OPEN   # HTTPS
+Port 22: OPEN    # SSH (should be restricted by IP)
+Port 3306: CLOSED # MySQL (should not be public)
+Port 5432: CLOSED # PostgreSQL (should not be public)
+Port 6379: CLOSED # Redis (should not be public)
+Port 27017: CLOSED # MongoDB (should not be public)
+
+---
+
+## 5. Advanced Tips & Tricks
+
+### curl Advanced Techniques
+
+#### Technique 1: Testing with Different User Agents
+# Pretend to be different browsers
+curl -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" https://example.com
+curl -A "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X)" https://example.com
+
+#### Technique 2: Rate Limiting Tests
+# Test API rate limiting
+for i in {1..100}; do
+  curl -w "Request $i: HTTP %{http_code}\n" -o /dev/null -s https://api.example.com/endpoint
+done
+
+#### Technique 3: Parallel Requests (using GNU parallel)
+# Test concurrent user load
+echo {1..100} | parallel -j 10 curl -s https://your-app.com > /dev/null
+
+#### Technique 4: Cookie Handling
+# Save cookies
+curl -c cookies.txt https://example.com/login -d "user=admin&pass=secret"
+
+# Use cookies in subsequent requests
+curl -b cookies.txt https://example.com/dashboard
+
+#### Technique 5: Resume Interrupted Downloads
+# Download large file with resume capability
+curl -C - -O https://example.com/large-file.iso
+
+# If download interrupts, run same command again to resume
+
+### ping Advanced Techniques
+
+#### Technique 1: Flood Ping (Performance Testing)
+# Requires root/sudo - sends packets as fast as possible
+sudo ping -f google.com
+# Use Ctrl+C to stop and see statistics
+
+#### Technique 2: Packet Size Testing (MTU Discovery)
+# Test different packet sizes to find MTU issues
+ping -s 1472 -M do google.com  # 1472 + 28 (header) = 1500 (standard MTU)
+ping -s 1473 -M do google.com  # Should fail if MTU is 1500
+
+#### Technique 3: Record Route
+# See the path packets take (limited to 9 hops)
+ping -R google.com
+
+#### Technique 4: Pattern Testing
+# Send specific bit patterns (for testing network equipment)
+ping -p ff google.com  # All 1s
+ping -p 00 google.com  # All 0s
+
+#### Technique 5: Timestamp Option
+# Include timestamp in ping packets
+ping -T tsonly google.com
+
+---
+
+## 6. Comparison: curl vs ping vs Other Tools
+
+| Tool | Purpose | Protocol | Use When |
+|------|---------|----------|----------|
+| curl | Data transfer, API testing | HTTP, FTP, etc. | Need to interact with web services |
+| ping | Connectivity testing | ICMP | Check if host is reachable |
+| telnet | Port connectivity | TCP | Check if specific port is open |
+| wget | File downloading | HTTP, FTP | Batch downloading files |
+| nc (netcat) | Network debugging | TCP/UDP | Low-level network testing |
+| traceroute | Path discovery | ICMP/UDP | Find network route to host |
+
+### When to Use What?
+
+Check if server is alive:
+→ Use: ping target-server.com
+
+Check if web service is responding:
+→ Use: curl -I http://target-server.com
+
+Check if specific port is open:
+→ Use: curl -v telnet://target-server.com:8080
+
+Download a file:
+→ Use: curl -O https://example.com/file.txt
+
+Test REST API:
+→ Use: curl -X POST https://api.example.com -d '{"key":"value"}'
+
+Find slow network hop:
+→ Use: traceroute target-server.com
+
+Test firewall rules:
+→ Use: ping + curl combination
+
+---
+
+## 7. Common Errors & Solutions
+
+### curl Common Errors
+
+Error: curl: (6) Could not resolve host
+Cause: DNS resolution failure
+Solution:
+# Check DNS
+nslookup example.com
+# Use IP address directly
+curl http://192.168.1.100
+# Or specify DNS server
+curl --dns-servers 8.8.8.8 https://example.com
+
+Error: curl: (7) Failed to connect to host
+Cause: Network unreachable or service down
+Solution:
+# Check connectivity
+ping target-host.com
+# Check if port is correct
+curl -v http://target-host.com:8080
+
+Error: curl: (35) SSL connect error
+Cause: SSL/TLS handshake failure
+Solution:
+# Check certificate
+curl -vI https://example.com
+# Temporarily bypass (NOT for production)
+curl -k https://example.com
+# Update CA certificates
+sudo update-ca-certificates
+
+Error: curl: (28) Operation timed out
+Cause: Request taking too long
+Solution:
+# Increase timeout
+curl --connect-timeout 30 --max-time 60 https://slow-server.com
+# Check network latency
+ping slow-server.com
+
+Error: curl: (52) Empty reply from server
+Cause: Server closed connection without response
+Solution:
+# Try different protocol version
+curl --http1.1 https://example.com
+curl --http2 https://example.com
+
+### ping Common Issues
+
+Issue: ping: unknown host
+Cause: DNS resolution failure
+Solution:
+# Check DNS configuration
+cat /etc/resolv.conf
+# Try with IP address
+ping 8.8.8.8
+# Flush DNS cache
+sudo systemd-resolve --flush-caches
+
+Issue: ping: Destination Host Unreachable
+Cause: No route to host
+Solution:
+# Check routing table
+route -n
+ip route show
+# Check gateway
+ping 192.168.1.1
+
+Issue: ping: Operation not permitted
+Cause: ICMP blocked or no permission
+Solution:
+# Run with sudo
+sudo ping target-host.com
+# Check firewall
+sudo iptables -L
+
+Issue: Request timeout
+Cause: Host not responding or ICMP blocked
+Solution:
+# Check if host blocks ICMP
+curl -I http://target-host.com  # Try HTTP instead
+# Try from different network
+# Contact network administrator
+
+Issue: High packet loss
+Cause: Network congestion or hardware issues
+Solution:
+# Check network quality over time
+ping -c 1000 google.com
+# Check local network first
+ping 192.168.1.1
+# If only remote hosts affected, likely ISP issue
+
+---
+
+## 8. Best Practices
+
+### curl Best Practices
+
+1. Always use timeouts in scripts:
+curl --connect-timeout 10 --max-time 30 https://api.example.com
+
+2. Check HTTP status codes:
+response=$(curl -s -o response.txt -w "%{http_code}" https://api.example.com)
+if [ $response -eq 200 ]; then
+  echo "Success"
+else
+  echo "Failed with status: $response"
+fi
+
+3. Use -f flag to fail silently on HTTP errors:
+curl -f https://api.example.com || echo "Request failed"
+
+4. Store sensitive data in files, not command line:
+# Bad (password visible in history):
+curl -u admin:password123 https://api.example.com
+
+# Good:
+curl -u admin:$(cat ~/.secrets/api-password) https://api.example.com
+# Or use .netrc file:
+curl -n https://api.example.com
+
+5. Log important information for debugging:
+curl -v https://api.example.com 2>&1 | tee curl-debug.log
+
+### ping Best Practices
+
+1. Use count flag in scripts:
+# Bad (runs forever):
+ping google.com
+
+# Good:
+ping -c 5 google.com
+
+2. Set timeout for automated checks:
+ping -c 3 -W 2 target-host.com || echo "Host unreachable"
+
+3. Use quiet mode in monitoring scripts:
+ping -q -c 10 target-host.com
+
+4. Don't rely solely on ping for service availability:
+# Better approach:
+ping -c 1 target-host.com && curl -f http://target-host.com/health
+
+5. Document baseline metrics:
+# Create baseline when system is healthy
+ping -c 100 production-server.com > baseline-$(date +%Y%m%d).txt
+
+---
+
+## 9. Quick Reference Cheat Sheet
+
+### curl Quick Commands
+# GET request
+curl https://api.example.com/data
+
+# POST with JSON
+curl -X POST https://api.example.com/data \
+  -H "Content-Type: application/json" \
+  -d '{"key":"value"}'
+
+# Download file
+curl -O https://example.com/file.txt
+
+# With authentication
+curl -u username:password https://api.example.com
+curl -H "Authorization: Bearer TOKEN" https://api.example.com
+
+# Check headers only
+curl -I https://example.com
+
+# Follow redirects
+curl -L https://short.url
+
+# Save response with timing
+curl -o output.txt -w "Time: %{time_total}s\n" https://example.com
+
+### ping Quick Commands
+# Basic ping
+ping google.com
+
+# Send 5 packets
+ping -c 5 google.com
+
+# Ping IP address
+ping 8.8.8.8
+
+# Quiet mode (summary only)
+ping -q -c 10 google.com
+
+# Custom interval (every 2 seconds)
+ping -i 2 google.com
+
+# Larger packet size
+ping -s 1000 google.com
+
+# Set timeout
+ping -W 5 google.com
+
+---
+
+## 10. Conclusion
+
+### When to Use curl:
+✅ Testing APIs and web services
+✅ Downloading files from internet
+✅ Checking HTTP status codes and headers
+✅ Automating web interactions
+✅ Debugging web applications
+✅ Uploading data to servers
+
+### When to Use ping:
+✅ Checking if a host is reachable
+✅ Measuring network latency
+✅ Detecting packet loss
+✅ Quick network diagnostics
+✅ Monitoring server availability
+✅ Troubleshooting connectivity issues
+
+### Key Takeaways:
+1. **curl** = Application layer (HTTP, FTP, etc.)
+2. **ping** = Network layer (ICMP)
+3. Use both together for comprehensive troubleshooting
+4. curl is more powerful for web services, ping is simpler for basic connectivity
+5. Always combine multiple tools for accurate diagnosis
+6. Document your findings for future reference
+
+---
+
+## Author Information
+Created by: Imran Afzal
+Website: www.utclisolutions.com
+
+For more Linux tutorials and DevOps guides, visit the website!
