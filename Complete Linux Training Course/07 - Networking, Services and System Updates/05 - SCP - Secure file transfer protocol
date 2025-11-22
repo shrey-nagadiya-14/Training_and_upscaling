@@ -1,0 +1,2044 @@
+# SCP - Secure Copy Protocol - Complete Guide
+
+## Table of Contents
+1. [What is SCP?](#what-is-scp)
+2. [How SCP Works](#how-scp-works)
+3. [SCP Syntax and Options](#scp-syntax-and-options)
+4. [SCP Examples](#scp-examples)
+5. [Daily Use Cases](#daily-use-cases)
+6. [Real-Life Scenarios](#real-life-scenarios)
+7. [SCP vs Other File Transfer Tools](#scp-vs-other-tools)
+8. [Security Best Practices](#security-best-practices)
+9. [Troubleshooting](#troubleshooting)
+10. [Quick Reference](#quick-reference)
+
+---
+
+## 1. What is SCP?
+
+### Definition
+- **SCP** stands for "Secure Copy Protocol"
+- A network protocol for securely transferring files between local and remote hosts
+- Built on top of SSH (Secure Shell) protocol
+- Provides encryption for both authentication and data transfer
+- Similar to FTP but with built-in security
+
+### Key Features
+✅ **Encryption**: All data is encrypted during transfer
+✅ **Authentication**: Uses SSH keys or passwords
+✅ **Simple**: Easy command-line interface
+✅ **Cross-platform**: Works on Linux, macOS, Windows (via tools)
+✅ **Reliable**: Uses TCP protocol for guaranteed delivery
+✅ **Recursive**: Can copy entire directories
+
+### Technical Details
+- **Default Port**: 22 (same as SSH)
+- **Protocol**: Built on SSH
+- **Encryption**: AES, 3DES, Blowfish (depends on SSH config)
+- **Authentication Methods**: Password, SSH keys, Kerberos
+- **Transfer Mode**: Binary mode (preserves file integrity)
+
+### SCP vs FTP vs SFTP
+
+| Feature | SCP | FTP | SFTP |
+|---------|-----|-----|------|
+| Encryption | Yes | No | Yes |
+| Port | 22 | 20/21 | 22 |
+| Security | High | Low | High |
+| Protocol | SSH | FTP | SSH |
+| Resume transfers | No | Yes | Yes |
+| Directory listing | No | Yes | Yes |
+| Speed | Fast | Fast | Medium |
+| Complexity | Simple | Simple | Medium |
+
+---
+
+## 2. How SCP Works
+
+### Architecture Overview
+
+Client Machine (A)                    Server Machine (B)
+┌──────────────────┐                 ┌──────────────────┐
+│                  │                 │                  │
+│  SCP Client      │───── SSH ─────→│  SSH Server      │
+│  (Port: Random)  │   (Port 22)    │  (sshd)          │
+│                  │←──── Data ─────│                  │
+│  File: jack      │    Encrypted   │  /home/iafzal/   │
+│                  │                 │                  │
+└──────────────────┘                 └──────────────────┘
+
+### Step-by-Step Process
+
+Step 1: User initiates SCP command
+$ scp jack iafzal@192.168.1.x:/home/iafzal
+
+Step 2: SCP establishes SSH connection
+- Client connects to server on port 22
+- SSH handshake occurs
+
+Step 3: Authentication
+- User prompted for password (or uses SSH key)
+- Credentials verified by SSH server
+
+Step 4: File Transfer
+- File "jack" is read from local system
+- Data is encrypted using SSH encryption
+- Encrypted data sent over network
+- Server receives and decrypts data
+- File written to /home/iafzal/ on server
+
+Step 5: Connection closed
+- Transfer complete
+- SSH connection terminated
+- SCP displays transfer statistics
+
+### Security Mechanism
+
+┌─────────────────────────────────────────────────┐
+│          SCP Security Layers                    │
+├─────────────────────────────────────────────────┤
+│  1. SSH Authentication (Password/Key)           │
+│  2. AES-256 Encryption (Data in Transit)        │
+│  3. Host Key Verification (Man-in-middle)       │
+│  4. Integrity Check (Data not tampered)         │
+└─────────────────────────────────────────────────┘
+
+---
+
+## 3. SCP Syntax and Options
+
+### Basic Syntax
+
+General Format:
+scp [options] source destination
+
+Local to Remote:
+scp /path/to/local/file username@remote_host:/path/to/remote/directory
+
+Remote to Local:
+scp username@remote_host:/path/to/remote/file /path/to/local/directory
+
+Remote to Remote:
+scp username@remote_host1:/file username@remote_host2:/destination
+
+### Common SCP Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `-r` | Recursively copy directories | `scp -r /local/dir user@host:/remote/` |
+| `-P` | Specify port number | `scp -P 2222 file user@host:/path/` |
+| `-p` | Preserve file attributes | `scp -p file user@host:/path/` |
+| `-q` | Quiet mode (no progress) | `scp -q file user@host:/path/` |
+| `-v` | Verbose mode (debugging) | `scp -v file user@host:/path/` |
+| `-C` | Enable compression | `scp -C large_file user@host:/path/` |
+| `-i` | Specify SSH key file | `scp -i ~/.ssh/id_rsa file user@host:/` |
+| `-l` | Limit bandwidth (Kbit/s) | `scp -l 1000 file user@host:/path/` |
+| `-o` | SSH options | `scp -o StrictHostKeyChecking=no file user@host:/` |
+| `-4` | Force IPv4 | `scp -4 file user@host:/path/` |
+| `-6` | Force IPv6 | `scp -6 file user@host:/path/` |
+
+### Understanding the Command Structure
+
+Example: scp jack iafzal@192.168.1.x:/home/iafzal
+
+Breaking it down:
+┌─────┬──────┬────────┬──────────────┬────────────────┐
+│ scp │ jack │ iafzal │ 192.168.1.x  │ /home/iafzal   │
+└─────┴──────┴────────┴──────────────┴────────────────┘
+   │      │      │           │               │
+Command Source Username  Server IP    Destination Path
+
+Components:
+- scp: Command to execute
+- jack: Source file (local file to copy)
+- iafzal: Username on remote server
+- @: Separator between username and hostname
+- 192.168.1.x: IP address or hostname of remote server
+- :: Separator between host and path
+- /home/iafzal: Destination directory on remote server
+
+---
+
+## 4. SCP Examples
+
+### Example 1: Copy Local File to Remote Server
+
+Scenario: You're logged in as user "iafzal" and want to copy file "jack" to remote server
+
+# Create a test file
+touch jack
+echo "This is a test file" > jack
+
+# Copy to remote server
+scp jack iafzal@192.168.1.100:/home/iafzal/
+
+# Output:
+# iafzal@192.168.1.100's password: [enter password]
+# jack                                    100%   20     0.5KB/s   00:00
+
+Result: File "jack" is now in /home/iafzal/ on remote server
+
+### Example 2: Copy Local File to Remote Server with Different Name
+
+# Copy and rename file
+scp jack iafzal@192.168.1.100:/home/iafzal/jack_backup
+
+# Or
+scp jack iafzal@192.168.1.100:/home/iafzal/renamed_file.txt
+
+Result: File saved with new name on remote server
+
+### Example 3: Copy Remote File to Local System
+
+# Download file from remote server to current directory
+scp iafzal@192.168.1.100:/home/iafzal/remote_file.txt .
+
+# Download to specific local directory
+scp iafzal@192.168.1.100:/home/iafzal/remote_file.txt /home/localuser/downloads/
+
+# Output:
+# remote_file.txt                         100%  1024    50.0KB/s   00:00
+
+Result: File downloaded from remote server to local machine
+
+### Example 4: Copy Directory Recursively
+
+# Copy entire directory with all contents
+scp -r /home/iafzal/myproject iafzal@192.168.1.100:/home/iafzal/
+
+# Directory structure:
+# myproject/
+#   ├── file1.txt
+#   ├── file2.txt
+#   └── subdir/
+#       └── file3.txt
+
+# All files and subdirectories copied
+
+### Example 5: Copy Multiple Files
+
+# Copy multiple files in one command
+scp file1.txt file2.txt file3.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Or using wildcard
+scp *.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Or copy specific pattern
+scp report*.pdf iafzal@192.168.1.100:/home/iafzal/reports/
+
+### Example 6: Copy with SSH Key Authentication
+
+# First, generate SSH key (if not already done)
+ssh-keygen -t rsa -b 4096
+
+# Copy public key to remote server
+ssh-copy-id iafzal@192.168.1.100
+
+# Now SCP without password
+scp -i ~/.ssh/id_rsa file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# No password prompt!
+
+### Example 7: Copy with Custom SSH Port
+
+# If SSH server runs on port 2222 instead of 22
+scp -P 2222 file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Note: It's -P (uppercase) for port, not -p (lowercase, which preserves attributes)
+
+### Example 8: Copy Large File with Compression
+
+# Enable compression for faster transfer
+scp -C large_database.sql iafzal@192.168.1.100:/home/iafzal/backups/
+
+# Good for:
+# - Large text files (logs, databases)
+# - Slow network connections
+# - Already compressed files (zip, jpg) won't benefit
+
+### Example 9: Copy with Bandwidth Limit
+
+# Limit to 1000 Kbit/s (125 KB/s)
+scp -l 1000 large_file.iso iafzal@192.168.1.100:/home/iafzal/
+
+# Useful for:
+# - Avoiding network congestion
+# - Background transfers
+# - Shared network environments
+
+### Example 10: Copy with Preserved Timestamps and Permissions
+
+# Preserve modification time, access time, and modes
+scp -p important_file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Original file:
+# -rw-r--r-- 1 user group 1024 Nov 21 10:30 important_file.txt
+
+# Copied file (preserves same attributes):
+# -rw-r--r-- 1 iafzal iafzal 1024 Nov 21 10:30 important_file.txt
+
+### Example 11: Copy Between Two Remote Servers
+
+# Copy from server1 to server2 (you're on local machine)
+scp user1@server1.com:/path/file.txt user2@server2.com:/path/
+
+# You'll be prompted for both passwords
+# File transfers directly between servers
+
+### Example 12: Verbose Mode for Debugging
+
+# See detailed connection information
+scp -v file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Output shows:
+# - SSH connection details
+# - Authentication process
+# - Transfer progress
+# - Any errors encountered
+
+### Example 13: Quiet Mode (No Progress Bar)
+
+# Silent transfer (useful for scripts)
+scp -q file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# No output unless error occurs
+
+### Example 14: Copy with Specific SSH Options
+
+# Disable strict host key checking (first-time connection)
+scp -o StrictHostKeyChecking=no file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Use specific cipher for encryption
+scp -o Cipher=aes256-ctr file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Multiple options
+scp -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null file.txt iafzal@192.168.1.100:/home/iafzal/
+
+### Example 15: Copy with IPv4 or IPv6
+
+# Force IPv4
+scp -4 file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Force IPv6
+scp -6 file.txt iafzal@2001:db8::1:/home/iafzal/
+
+---
+
+## 5. Daily Use Cases
+
+### Use Case 1: Backup Files to Remote Server
+
+Scenario: Daily backup of important documents to a backup server
+
+# Single file backup
+scp /home/iafzal/documents/important.docx backup@backupserver.com:/backups/daily/
+
+# Multiple files backup
+scp /home/iafzal/documents/*.pdf backup@backupserver.com:/backups/documents/
+
+# Entire directory backup
+scp -r /home/iafzal/projects backup@backupserver.com:/backups/$(date +%Y%m%d)/
+
+# Automated daily backup script
+#!/bin/bash
+BACKUP_DATE=$(date +%Y%m%d)
+scp -r /home/iafzal/important_data backup@backupserver.com:/backups/$BACKUP_DATE/
+echo "Backup completed on $BACKUP_DATE" | mail -s "Backup Status" admin@company.com
+
+Real-Life Example:
+- Accounting department backing up financial records
+- Developer backing up source code
+- Database administrator backing up database dumps
+
+### Use Case 2: Deploy Code to Production Server
+
+Scenario: Web developer deploying website updates
+
+# Deploy single file
+scp index.html webadmin@production.com:/var/www/html/
+
+# Deploy entire website
+scp -r /home/iafzal/mywebsite/* webadmin@production.com:/var/www/html/
+
+# Deploy with specific files excluded (use rsync instead, but for SCP context)
+scp config.php app.js style.css webadmin@production.com:/var/www/html/
+
+# Deployment script
+#!/bin/bash
+echo "Deploying to production..."
+scp -r /home/iafzal/website/build/* webadmin@production.com:/var/www/html/
+scp /home/iafzal/website/.env webadmin@production.com:/var/www/html/
+echo "Deployment complete!"
+
+Real-Life Example:
+- Deploying bug fixes to live website
+- Updating configuration files
+- Rolling out new features
+
+### Use Case 3: Download Server Logs for Analysis
+
+Scenario: System administrator needs to analyze application logs
+
+# Download today's log
+scp sysadmin@server.com:/var/log/application.log /home/iafzal/logs/
+
+# Download multiple logs
+scp sysadmin@server.com:/var/log/apache2/*.log /home/iafzal/logs/apache/
+
+# Download with date in filename
+scp sysadmin@server.com:/var/log/app.log /home/iafzal/logs/app_$(date +%Y%m%d).log
+
+# Automated log collection script
+#!/bin/bash
+LOG_DATE=$(date +%Y%m%d)
+SERVERS=("web1.com" "web2.com" "web3.com")
+for server in "${SERVERS[@]}"; do
+  scp sysadmin@$server:/var/log/application.log /home/iafzal/logs/${server}_${LOG_DATE}.log
+done
+echo "Logs collected from ${#SERVERS[@]} servers"
+
+Real-Life Example:
+- Debugging production issues
+- Security audit log collection
+- Performance analysis
+
+### Use Case 4: Transfer Database Dumps
+
+Scenario: Database administrator transferring database backups
+
+# Export and transfer database
+mysqldump -u root -p mydb > mydb_backup.sql
+scp mydb_backup.sql dbadmin@backup-server.com:/database-backups/
+
+# Compressed database transfer
+mysqldump -u root -p mydb | gzip > mydb_backup.sql.gz
+scp mydb_backup.sql.gz dbadmin@backup-server.com:/database-backups/
+
+# Complete backup script
+#!/bin/bash
+BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+DB_NAME="production_db"
+BACKUP_FILE="${DB_NAME}_${BACKUP_DATE}.sql.gz"
+
+# Create backup
+mysqldump -u root -p${DB_PASSWORD} ${DB_NAME} | gzip > /tmp/${BACKUP_FILE}
+
+# Transfer to backup server
+scp /tmp/${BACKUP_FILE} dbadmin@backup-server.com:/database-backups/
+
+# Cleanup local temp file
+rm /tmp/${BACKUP_FILE}
+
+echo "Database backup completed: ${BACKUP_FILE}"
+
+Real-Life Example:
+- Daily database backups
+- Before major database migrations
+- Disaster recovery preparation
+
+### Use Case 5: Share Files with Team Members
+
+Scenario: Developer sharing files with remote team
+
+# Share project file with colleague
+scp project_plan.pdf colleague@team-server.com:/home/colleague/shared/
+
+# Share entire project folder
+scp -r /home/iafzal/project_docs team@team-server.com:/shared/projects/
+
+# Share multiple files
+scp report.docx presentation.pptx data.xlsx team@team-server.com:/shared/meeting_materials/
+
+Real-Life Example:
+- Sharing design mockups with frontend team
+- Distributing meeting materials
+- Sharing test data with QA team
+
+### Use Case 6: Collect Configuration Files from Multiple Servers
+
+Scenario: System administrator auditing server configurations
+
+# Collect config from single server
+scp root@server1.com:/etc/nginx/nginx.conf /home/iafzal/audit/server1_nginx.conf
+
+# Automated collection from multiple servers
+#!/bin/bash
+SERVERS=("server1.com" "server2.com" "server3.com")
+CONFIG="/etc/nginx/nginx.conf"
+OUTPUT_DIR="/home/iafzal/audit/configs"
+
+mkdir -p $OUTPUT_DIR
+
+for server in "${SERVERS[@]}"; do
+  echo "Collecting config from $server..."
+  scp root@$server:$CONFIG $OUTPUT_DIR/${server}_nginx.conf
+done
+
+echo "Configuration collection complete!"
+
+Real-Life Example:
+- Security compliance audit
+- Configuration standardization check
+- Disaster recovery documentation
+
+### Use Case 7: Transfer Media Files
+
+Scenario: Video editor transferring large video files
+
+# Transfer single video file
+scp -C movie_project.mp4 editor@edit-server.com:/media/projects/
+
+# Transfer with bandwidth limit (to avoid saturating network)
+scp -l 5000 large_video.mp4 editor@edit-server.com:/media/incoming/
+
+# Transfer multiple media files
+scp *.mp4 editor@edit-server.com:/media/raw_footage/
+
+Real-Life Example:
+- Photographer transferring RAW images
+- Video production team sharing footage
+- Audio engineer sharing multi-track recordings
+
+### Use Case 8: Automated Report Distribution
+
+Scenario: Automated system generating and distributing daily reports
+
+# Report generation and distribution script
+#!/bin/bash
+REPORT_DATE=$(date +%Y-%m-%d)
+REPORT_FILE="sales_report_${REPORT_DATE}.pdf"
+
+# Generate report (example)
+/usr/local/bin/generate_report.sh > /tmp/${REPORT_FILE}
+
+# Distribute to management servers
+MANAGERS=("manager1@hq.com" "manager2@hq.com" "ceo@hq.com")
+
+for manager in "${MANAGERS[@]}"; do
+  scp /tmp/${REPORT_FILE} ${manager}:/reports/daily/
+  echo "Report sent to ${manager}"
+done
+
+# Cleanup
+rm /tmp/${REPORT_FILE}
+
+Real-Life Example:
+- Daily sales reports to management
+- Automated compliance reports
+- Performance metrics distribution
+
+### Use Case 9: Software Distribution
+
+Scenario: IT department distributing software packages
+
+# Distribute software package
+scp software_installer_v2.5.tar.gz admin@client-machine.com:/tmp/
+
+# Distribute to multiple machines
+#!/bin/bash
+PACKAGE="software_v2.5.tar.gz"
+MACHINES=("192.168.1.10" "192.168.1.11" "192.168.1.12")
+
+for machine in "${MACHINES[@]}"; do
+  echo "Deploying to $machine..."
+  scp $PACKAGE admin@$machine:/opt/software/
+  ssh admin@$machine "cd /opt/software && tar -xzf $PACKAGE"
+done
+
+Real-Life Example:
+- Deploying security patches
+- Distributing internal applications
+- Rolling out software updates
+
+### Use Case 10: Certificate and Key Management
+
+Scenario: Security team distributing SSL certificates
+
+# Transfer SSL certificate
+scp ssl_certificate.crt webadmin@webserver.com:/etc/ssl/certs/
+
+# Transfer private key (securely)
+scp -p ssl_private.key webadmin@webserver.com:/etc/ssl/private/
+
+# Complete SSL setup transfer
+scp certificate.crt private.key ca_bundle.crt webadmin@webserver.com:/etc/ssl/new/
+
+Real-Life Example:
+- Renewing SSL certificates
+- Setting up new HTTPS server
+- Certificate rotation for security
+
+---
+
+## 6. Real-Life Scenarios
+
+### Scenario 1: Emergency Website Restore
+
+Problem: Production website is down due to corruption
+
+Solution Steps:
+
+# 1. Quick assessment
+ssh webadmin@production.com "ls -la /var/www/html"
+
+# 2. Download corrupted files for analysis
+scp -r webadmin@production.com:/var/www/html /home/iafzal/emergency_backup/
+
+# 3. Restore from backup server
+scp -r backup@backup-server.com:/backups/latest/html/* /tmp/restore/
+
+# 4. Upload restored files
+scp -r /tmp/restore/* webadmin@production.com:/var/www/html/
+
+# 5. Verify website is back
+curl -I https://production.com
+
+# 6. Check permissions
+ssh webadmin@production.com "chown -R www-data:www-data /var/www/html"
+
+Timeline:
+- 0 min: Issue detected
+- 2 min: Backup downloaded
+- 5 min: Files restored
+- 7 min: Website back online
+- Total downtime: 7 minutes
+
+### Scenario 2: Multi-Server Configuration Sync
+
+Problem: Need to deploy same configuration to 50 web servers
+
+Solution: Parallel deployment script
+
+#!/bin/bash
+CONFIG_FILE="nginx.conf"
+SERVERS_FILE="servers.txt"  # Contains list of server IPs
+
+# Function to deploy to single server
+deploy_to_server() {
+  local server=$1
+  echo "Deploying to $server..."
+  scp $CONFIG_FILE root@$server:/etc/nginx/nginx.conf
+  ssh root@$server "nginx -t && systemctl reload nginx"
+  if [ $? -eq 0 ]; then
+    echo "✓ $server - SUCCESS"
+  else
+    echo "✗ $server - FAILED"
+  fi
+}
+
+# Export function for parallel execution
+export -f deploy_to_server
+export CONFIG_FILE
+
+# Deploy to all servers in parallel (10 at a time)
+cat $SERVERS_FILE | parallel -j 10 deploy_to_server
+
+echo "Deployment complete!"
+
+Results:
+- 50 servers updated
+- 10 concurrent transfers
+- Completed in 5 minutes
+- 0 failures
+
+### Scenario 3: Developer Workflow - Code to Production
+
+Problem: Developer needs to push code changes to staging then production
+
+Complete Workflow:
+
+# 1. Develop locally
+git commit -m "Fixed bug #123"
+
+# 2. Build production assets
+npm run build
+
+# 3. Deploy to staging
+scp -r build/* devops@staging.company.com:/var/www/staging/
+scp .env.staging devops@staging.company.com:/var/www/staging/.env
+
+# 4. Test on staging
+curl https://staging.company.com/api/health
+# Run automated tests
+ssh devops@staging.company.com "cd /var/www/staging && npm test"
+
+# 5. If tests pass, deploy to production
+if [ $? -eq 0 ]; then
+  echo "Tests passed, deploying to production..."
+  scp -r build/* devops@production.company.com:/var/www/production/
+  scp .env.production devops@production.company.com:/var/www/production/.env
+  
+  # Restart services
+  ssh devops@production.company.com "systemctl restart app-server"
+  
+  echo "✓ Production deployment complete!"
+else
+  echo "✗ Tests failed, deployment cancelled"
+  exit 1
+fi
+
+### Scenario 4: Security Incident Response
+
+Problem: Security breach detected, need to collect evidence from compromised server
+
+Evidence Collection Procedure:
+
+#!/bin/bash
+INCIDENT_DATE=$(date +%Y%m%d_%H%M%S)
+EVIDENCE_DIR="/home/forensics/incident_${INCIDENT_DATE}"
+COMPROMISED_SERVER="192.168.1.100"
+
+mkdir -p $EVIDENCE_DIR
+
+echo "=== Security Incident Evidence Collection ==="
+echo "Target: $COMPROMISED_SERVER"
+echo "Time: $(date)"
+
+# 1. Collect system logs
+echo "Collecting system logs..."
+scp root@$COMPROMISED_SERVER:/var/log/auth.log $EVIDENCE_DIR/
+scp root@$COMPROMISED_SERVER:/var/log/syslog $EVIDENCE_DIR/
+scp root@$COMPROMISED_SERVER:/var/log/apache2/access.log $EVIDENCE_DIR/
+
+# 2. Collect user activity
+echo "Collecting user activity..."
+ssh root@$COMPROMISED_SERVER "last -a" > $EVIDENCE_DIR/last_logins.txt
+ssh root@$COMPROMISED_SERVER "w" > $EVIDENCE_DIR/current_users.txt
+
+# 3. Collect network connections
+echo "Collecting network state..."
+ssh root@$COMPROMISED_SERVER "netstat -tulpn" > $EVIDENCE_DIR/network_connections.txt
+
+# 4. Collect running processes
+echo "Collecting process list..."
+ssh root@$COMPROMISED_SERVER "ps auxf" > $EVIDENCE_DIR/process_list.txt
+
+# 5. Collect suspicious files
+echo "Collecting suspicious files..."
+scp -r root@$COMPROMISED_SERVER:/tmp/* $EVIDENCE_DIR/tmp_files/
+scp -r root@$COMPROMISED_SERVER:/var/www/* $EVIDENCE_DIR/web_files/
+
+# 6. Create hash of evidence
+echo "Creating evidence hash..."
+find $EVIDENCE_DIR -type f -exec md5sum {} \; > $EVIDENCE_DIR/evidence_hashes.txt
+
+echo "Evidence collection complete: $EVIDENCE_DIR"
+echo "Next steps: Isolate server, analyze evidence, report to security team"
+
+### Scenario 5: Database Migration Between Servers
+
+Problem: Migrating production database from old server to new server
+
+Migration Steps:
+
+#!/bin/bash
+OLD_SERVER="old-db.company.com"
+NEW_SERVER="new-db.company.com"
+DB_NAME="production_db"
+MIGRATION_DATE=$(date +%Y%m%d_%H%M%S)
+
+echo "=== Database Migration: $OLD_SERVER → $NEW_SERVER ==="
+
+# 1. Create backup on old server
+echo "Step 1: Creating backup..."
+ssh root@$OLD_SERVER "mysqldump -u root -p${DB_PASSWORD} $DB_NAME | gzip > /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz"
+
+# 2. Transfer backup to local machine
+echo "Step 2: Downloading backup..."
+scp root@$OLD_SERVER:/tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz /tmp/
+
+# 3. Transfer backup to new server
+echo "Step 3: Uploading to new server..."
+scp /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz root@$NEW_SERVER:/tmp/
+
+# 4. Restore on new server
+echo "Step 4: Restoring database..."
+ssh root@$NEW_SERVER "gunzip < /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz | mysql -u root -p${DB_PASSWORD} $DB_NAME"
+
+# 5. Verify data integrity
+echo "Step 5: Verifying migration..."
+OLD_COUNT=$(ssh root@$OLD_SERVER "mysql -u root -p${DB_PASSWORD} -e 'SELECT COUNT(*) FROM $DB_NAME.users;' -N")
+NEW_COUNT=$(ssh root@$NEW_SERVER "mysql -u root -p${DB_PASSWORD} -e 'SELECT COUNT(*) FROM $DB_NAME.users;' -N")
+
+if [ "$OLD_COUNT" == "$NEW_COUNT" ]; then
+  echo "✓ Migration successful! Record counts match: $OLD_COUNT"
+else
+  echo "✗ Migration failed! Record count mismatch: Old=$OLD_COUNT, New=$NEW_COUNT"
+  exit 1
+fi
+
+# 6. Cleanup
+echo "Step 6: Cleaning up temporary files..."
+ssh root@$OLD_SERVER "rm /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz"
+ssh root@$NEW_SERVER "rm /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz"
+rm /tmp/${DB_NAME}_${MIGRATION_DATE}.sql.gz
+
+echo "Migration complete!"
+
+### Scenario 6: Batch Image Processing and Upload
+
+Problem: Photographer needs to process and upload 1000 images to client server
+
+Workflow:
+
+#!/bin/bash
+SOURCE_DIR="/home/photographer/raw_photos"
+PROCESSED_DIR="/home/photographer/processed"
+CLIENT_SERVER="client@images.clientsite.com"
+UPLOAD_PATH="/var/www/gallery/photos"
+
+echo "=== Batch Image Processing and Upload ==="
+
+# 1. Process images (example: resize and compress)
+echo "Step 1: Processing images..."
+mkdir -p $PROCESSED_DIR
+for img in $SOURCE_DIR/*.jpg; do
+  filename=$(basename "$img")
+  echo "Processing $filename..."
+  convert "$img" -resize 1920x1080 -quality 85 "$PROCESSED_DIR/$filename"
+done
+
+# 2. Count processed images
+TOTAL_IMAGES=$(ls -1 $PROCESSED_DIR | wc -l)
+echo "Processed $TOTAL_IMAGES images"
+
+# 3. Upload in batches (to avoid timeout)
+echo "Step 2: Uploading to client server..."
+BATCH_SIZE=50
+CURRENT_BATCH=0
+
+cd $PROCESSED_DIR
+for img in *.jpg; do
+  scp "$img" $CLIENT_SERVER:$UPLOAD_PATH/
+  ((CURRENT_BATCH++))
+  
+  if [ $((CURRENT_BATCH % BATCH_SIZE)) -eq 0 ]; then
+    echo "Uploaded $CURRENT_BATCH/$TOTAL_IMAGES images..."
+  fi
+done
+
+echo "✓ Upload complete! $TOTAL_IMAGES images uploaded to client server"
+
+# 4. Verify upload
+UPLOADED_COUNT=$(ssh $CLIENT_SERVER "ls -1 $UPLOAD_PATH/*.jpg | wc -l")
+echo "Verification: $UPLOADED_COUNT images found on server"
+
+### Scenario 7: Log Rotation and Archive
+
+Problem: Server logs are filling up disk, need to archive old logs to backup server
+
+Automated Log Management:
+
+#!/bin/bash
+LOG_SERVER="webserver.company.com"
+BACKUP_SERVER="backup@archive.company.com"
+ARCHIVE_DATE=$(date +%Y%m%d)
+ARCHIVE_PATH="/archives/logs/$ARCHIVE_DATE"
+
+echo "=== Log Rotation and Archive ==="
+
+# 1. Create archive on log server
+echo "Step 1: Creating log archive..."
+ssh root@$LOG_SERVER << 'ENDSSH'
+  cd /var/log
+  tar -czf /tmp/logs_archive_$ARCHIVE_DATE.tar.gz \
+    apache2/*.log.1 \
+    nginx/*.log.1 \
+    syslog.1 \
+    auth.log.1
+  echo "Archive created: /tmp/logs_archive_$ARCHIVE_DATE.tar.gz"
+ENDSSH
+
+# 2. Transfer archive to backup server
+echo "Step 2: Transferring to backup server..."
+scp root@$LOG_SERVER:/tmp/logs_archive_${ARCHIVE_DATE}.tar.gz /tmp/
+
+# 3. Upload to backup server
+echo "Step 3: Uploading to archive server..."
+ssh $BACKUP_SERVER "mkdir -p $ARCHIVE_PATH"
+scp /tmp/logs_archive_${ARCHIVE_DATE}.tar.gz $BACKUP_SERVER:$ARCHIVE_PATH/
+
+# 4. Verify and cleanup
+echo "Step 4: Verification and cleanup..."
+if ssh $BACKUP_SERVER "test -f $ARCHIVE_PATH/logs_archive_${ARCHIVE_DATE}.tar.gz"; then
+  echo "✓ Archive verified on backup server"
+  
+  # Remove old logs from log server
+  ssh root@$LOG_SERVER "rm /var/log/apache2/*.log.1 /var/log/nginx/*.log.1"
+  
+  # Remove temporary files
+  ssh root@$LOG_SERVER "rm /tmp/logs_archive_${ARCHIVE_DATE}.tar.gz"
+  rm /tmp/logs_archive_${ARCHIVE_DATE}.tar.gz
+  
+  echo "✓ Cleanup complete"
+else
+  echo "✗ Archive verification failed! Not deleting source logs."
+  exit 1
+fi
+
+echo "Log rotation complete. Disk space freed on $LOG_SERVER"
+
+---
+
+## 7. SCP vs Other File Transfer Tools
+
+### Detailed Comparison
+
+Tool 1: SCP (Secure Copy)
+Pros:
+✓ Simple syntax
+✓ Built into most Unix/Linux systems
+✓ Fast for single transfers
+✓ Encrypted by default
+✓ Uses standard SSH authentication
+✓ Good for one-off file transfers
+
+Cons:
+✗ No resume capability
+✗ Can't skip existing files
+✗ Transfers entire file even if partially exists
+✗ No synchronization features
+✗ Slower for multiple small files
+
+Best for:
+- Quick file transfers
+- Copying single files or directories
+- When simplicity is priority
+- Automated scripts
+
+Tool 2: SFTP (SSH File Transfer Protocol)
+Pros:
+✓ Interactive file browsing
+✓ Can list directories
+✓ Resume interrupted transfers
+✓ Encrypted like SCP
+✓ More control over transfers
+✓ Can delete remote files
+
+Cons:
+✗ More complex than SCP
+✗ Requires interactive session or script
+✗ Slightly slower than SCP
+✗ More overhead
+
+Best for:
+- Interactive file management
+- When you need to browse remote directories
+- Managing multiple files interactively
+
+Tool 3: rsync (Remote Sync)
+Pros:
+✓ Only transfers changed parts of files (delta transfer)
+✓ Can resume interrupted transfers
+✓ Synchronization capability
+✓ Skip existing unchanged files
+✓ Compress during transfer
+✓ Show detailed progress
+✓ Can delete files on destination
+
+Cons:
+✗ More complex syntax
+✗ Requires rsync on both ends
+✗ Slightly more overhead for small transfers
+✗ Learning curve
+
+Best for:
+- Synchronizing directories
+- Large file transfers
+- Incremental backups
+- Regular scheduled syncs
+
+Tool 4: FTP (File Transfer Protocol)
+Pros:
+✓ Universal support
+✓ Simple protocol
+✓ Resume capability
+✓ Wide client support
+
+Cons:
+✗ NO ENCRYPTION (insecure)
+✗ Passwords sent in plain text
+✗ Should not be used anymore
+✗ Firewall issues (multiple ports)
+
+Best for:
+- Legacy systems only
+- Internal networks (not recommended)
+- Public file download servers (read-only)
+
+### Side-by-Side Command Comparison
+
+Task: Copy file to remote server
+
+SCP:
+scp file.txt user@server.com:/path/
+
+SFTP:
+sftp user@server.com
+put file.txt /path/
+quit
+
+rsync:
+rsync -avz file.txt user@server.com:/path/
+
+FTP:
+ftp server.com
+[login]
+put file.txt
+quit
+
+Task: Copy directory recursively
+
+SCP:
+scp -r /local/dir user@server.com:/remote/
+
+SFTP:
+sftp user@server.com
+put -r /local/dir /remote/
+quit
+
+rsync:
+rsync -avz /local/dir/ user@server.com:/remote/
+
+FTP:
+# Requires manual directory creation and multiple put commands
+
+Task: Resume interrupted transfer
+
+SCP:
+# NOT POSSIBLE - must restart from beginning
+
+SFTP:
+sftp user@server.com
+reget file.txt
+quit
+
+rsync:
+rsync -avz --partial file.txt user@server.com:/path/
+
+FTP:
+ftp server.com
+[login]
+rest 1234567  # Resume from byte position
+get file.txt
+quit
+
+### Performance Comparison
+
+Test scenario: Transfer 1GB file over 100 Mbps network
+
+SCP:
+- Time: 85 seconds
+- CPU usage: Medium
+- Memory: Low
+- Features: Basic transfer
+
+SFTP:
+- Time: 90 seconds
+- CPU usage: Medium
+- Memory: Low
+- Features: Interactive control
+
+rsync:
+- Time (first): 88 seconds
+- Time (second/unchanged): 2 seconds
+- CPU usage: Higher (compression)
+- Memory: Medium
+- Features: Smart sync
+
+FTP:
+- Time: 83 seconds
+- CPU usage: Low
+- Memory: Low
+- Security: NONE
+
+Test scenario: Transfer 10,000 small files (10KB each)
+
+SCP:
+- Time: 12 minutes
+- Creates new connection overhead for each file
+
+SFTP:
+- Time: 10 minutes
+- Maintains single connection
+
+rsync:
+- Time: 6 minutes
+- Optimized for many small files
+- Can use compression
+
+FTP:
+- Time: 11 minutes
+- No encryption overhead (but insecure)
+
+### When to Use What - Decision Tree
+
+Do you need encryption?
+├─ NO → FTP (only if internal network, not recommended)
+└─ YES → Continue
+
+Is it a one-time transfer?
+├─ YES → SCP (simplest)
+└─ NO → Continue
+
+Do you need to sync regularly?
+├─ YES → rsync (delta transfers save time)
+└─ NO → Continue
+
+Do you need interactive file management?
+├─ YES → SFTP (browse, delete, rename)
+└─ NO → SCP or rsync
+
+Will transfers be interrupted frequently?
+├─ YES → rsync (resume capability)
+└─ NO → SCP (simpler)
+
+---
+
+## 8. Security Best Practices
+
+### Practice 1: Use SSH Key Authentication
+
+Why: Passwords can be brute-forced, keys cannot
+
+# Step 1: Generate SSH key pair (if not already done)
+ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
+
+# Output:
+# Generating public/private rsa key pair.
+# Enter file in which to save the key (/home/user/.ssh/id_rsa): [press enter]
+# Enter passphrase (empty for no passphrase): [enter strong passphrase]
+# Your identification has been saved in /home/user/.ssh/id_rsa
+# Your public key has been saved in /home/user/.ssh/id_rsa.pub
+
+# Step 2: Copy public key to remote server
+ssh-copy-id iafzal@192.168.1.100
+
+# Step 3: Now SCP without password
+scp file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Step 4: Disable password authentication on server (optional, more secure)
+# On server, edit /etc/ssh/sshd_config:
+# PasswordAuthentication no
+# Then restart: systemctl restart sshd
+
+Benefits:
+✓ No password to steal or guess
+✓ Can use different keys for different purposes
+✓ Can revoke keys individually
+✓ Can add passphrase to key for extra security
+
+### Practice 2: Restrict SSH Access by IP
+
+# On remote server, edit /etc/ssh/sshd_config
+# Allow only specific IPs to connect
+
+AllowUsers iafzal@192.168.1.50 iafzal@192.168.1.51
+
+# Or use firewall
+iptables -A INPUT -p tcp --dport 22 -s 192.168.1.50 -j ACCEPT
+iptables -A INPUT -p tcp --dport 22 -j DROP
+
+# Save iptables rules
+iptables-save > /etc/iptables/rules.v4
+
+Benefits:
+✓ Prevents access from unknown locations
+✓ Reduces attack surface
+✓ Logs only legitimate access attempts
+
+### Practice 3: Change Default SSH Port
+
+Why: Reduces automated attacks on port 22
+
+# On remote server, edit /etc/ssh/sshd_config
+Port 2222  # Change from 22 to custom port
+
+# Restart SSH service
+systemctl restart sshd
+
+# Now use SCP with custom port
+scp -P 2222 file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Benefits:
+✓ Eliminates 99% of automated attacks
+✓ Reduces log noise
+✓ Still secure even if port is discovered
+
+Security note: This is "security by obscurity" - use with other measures, not alone
+
+### Practice 4: Use SSH Config for Convenience and Security
+
+# Create ~/.ssh/config file
+Host myserver
+    HostName 192.168.1.100
+    User iafzal
+    Port 2222
+    IdentityFile ~/.ssh/myserver_key
+    StrictHostKeyChecking yes
+    UserKnownHostsFile ~/.ssh/known_hosts
+
+Host production
+    HostName production.company.com
+    User deploy
+    Port 22
+    IdentityFile ~/.ssh/production_key
+    ForwardAgent no
+    PasswordAuthentication no
+
+# Now use simple alias
+scp file.txt myserver:/home/iafzal/
+scp file.txt production:/var/www/html/
+
+Benefits:
+✓ Enforces security settings
+✓ Simplifies commands
+✓ Different keys for different servers
+✓ Documents server access methods
+
+### Practice 5: Use Bastion/Jump Host
+
+Scenario: Production servers not directly accessible from internet
+
+Architecture:
+Internet → Bastion Host → Private Server
+
+# Method 1: ProxyJump (SSH 7.3+)
+scp -J bastion.company.com file.txt user@private-server:/path/
+
+# Method 2: Using SSH config
+# In ~/.ssh/config:
+Host private-server
+    HostName 10.0.1.50
+    User admin
+    ProxyJump bastion.company.com
+
+# Then simple command:
+scp file.txt private-server:/path/
+
+Benefits:
+✓ Private servers not exposed to internet
+✓ Single point of access control
+✓ All access logged on bastion
+✓ Can enforce MFA on bastion
+
+### Practice 6: Verify Host Key Fingerprints
+
+# First connection to new server
+scp file.txt iafzal@new-server.com:/path/
+
+# Output:
+# The authenticity of host 'new-server.com (192.168.1.100)' can't be established.
+# ECDSA key fingerprint is SHA256:xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.
+# Are you sure you want to continue connecting (yes/no)?
+
+# IMPORTANT: Verify this fingerprint matches what server admin provided
+# On server, get fingerprint:
+ssh-keygen -lf /etc/ssh/ssh_host_ecdsa_key.pub
+
+# Compare before typing 'yes'
+
+Why: Prevents man-in-the-middle attacks
+
+### Practice 7: Limit File Permissions After Transfer
+
+# After SCP transfer, set proper permissions
+scp sensitive_data.txt user@server.com:/tmp/
+
+# Then set restrictive permissions
+ssh user@server.com "chmod 600 /tmp/sensitive_data.txt"
+
+# Or combine in script
+scp sensitive_data.txt user@server.com:/tmp/ && \
+ssh user@server.com "chmod 600 /tmp/sensitive_data.txt && chown user:user /tmp/sensitive_data.txt"
+
+Benefits:
+✓ Prevents unauthorized access on destination
+✓ Follows principle of least privilege
+✓ Maintains security posture
+
+### Practice 8: Use SCP in Scripts Securely
+
+# Bad: Password in script (NEVER DO THIS)
+scp file.txt user:password123@server.com:/path/
+
+# Good: Use SSH keys
+scp -i ~/.ssh/deploy_key file.txt user@server.com:/path/
+
+# Better: Use SSH agent
+eval $(ssh-agent)
+ssh-add ~/.ssh/deploy_key
+scp file.txt user@server.com:/path/
+
+# Best: Use dedicated deployment keys with restrictions
+# On server, in ~/.ssh/authorized_keys:
+command="/usr/local/bin/deploy.sh",no-agent-forwarding,no-X11-forwarding,no-port-forwarding ssh-rsa AAAAB3...
+
+Benefits:
+✓ No passwords exposed
+✓ Can restrict what key can do
+✓ Audit trail of actions
+✓ Can revoke without password change
+
+### Practice 9: Monitor and Log SCP Activity
+
+# Enable detailed SSH logging on server
+# Edit /etc/ssh/sshd_config:
+LogLevel VERBOSE
+
+# Monitor SCP activity
+tail -f /var/log/auth.log | grep scp
+
+# Sample output:
+# Nov 22 10:30:15 server sshd[12345]: Accepted publickey for iafzal from 192.168.1.50 port 54321 ssh2: RSA SHA256:xxx
+# Nov 22 10:30:15 server sshd[12345]: subsystem request for sftp by user iafzal
+
+# Set up alerts for suspicious activity
+# Create /etc/logwatch/conf/services/scp-monitor.conf
+
+Benefits:
+✓ Detect unauthorized access
+✓ Forensics for security incidents
+✓ Compliance requirements
+✓ Usage patterns analysis
+
+### Practice 10: Regular Security Audits
+
+# Audit SSH keys on server
+for user in $(ls /home); do
+  echo "=== User: $user ==="
+  if [ -f /home/$user/.ssh/authorized_keys ]; then
+    cat /home/$user/.ssh/authorized_keys
+  fi
+done
+
+# Check for weak SSH configurations
+ssh-audit server.company.com
+
+# Review SSH logs for anomalies
+lastb | head -20  # Failed login attempts
+last | grep -v "still logged in"  # Successful logins
+
+# Check for old/unused keys
+find /home -name "authorized_keys" -exec grep -H . {} \;
+
+Regular tasks:
+□ Monthly: Review authorized_keys on all servers
+□ Quarterly: Rotate SSH keys
+□ Yearly: Update SSH server software
+□ Always: Remove access for departed employees immediately
+
+---
+
+## 9. Troubleshooting
+
+### Issue 1: Permission Denied (publickey)
+
+Error:
+scp file.txt iafzal@192.168.1.100:/home/iafzal/
+Permission denied (publickey).
+
+Possible Causes & Solutions:
+
+Cause 1: SSH key not set up
+Solution:
+# Copy your public key to server
+ssh-copy-id iafzal@192.168.1.100
+
+Cause 2: Wrong key being used
+Solution:
+# Specify correct key
+scp -i ~/.ssh/correct_key file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Cause 3: Key permissions too open
+Solution:
+# Fix key permissions
+chmod 600 ~/.ssh/id_rsa
+chmod 644 ~/.ssh/id_rsa.pub
+chmod 700 ~/.ssh
+
+Cause 4: Server-side authorized_keys permissions
+Solution:
+# On server:
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+
+Cause 5: SELinux preventing access (CentOS/RHEL)
+Solution:
+# On server:
+restorecon -R ~/.ssh
+
+### Issue 2: Connection Timed Out
+
+Error:
+scp file.txt iafzal@192.168.1.100:/home/iafzal/
+ssh: connect to host 192.168.1.100 port 22: Connection timed out
+
+Diagnostic Steps:
+
+# Step 1: Check if host is reachable
+ping 192.168.1.100
+
+# Step 2: Check if SSH port is open
+telnet 192.168.1.100 22
+# Or
+nc -zv 192.168.1.100 22
+
+# Step 3: Check firewall on client
+sudo iptables -L OUTPUT -n | grep 22
+
+# Step 4: Check firewall on server (if you have access)
+sudo iptables -L INPUT -n | grep 22
+
+# Step 5: Check if SSH is running on server
+ssh iafzal@192.168.1.100 "systemctl status sshd"
+
+Solutions:
+- If ping fails: Network issue, check routing
+- If SSH port closed: Firewall blocking, open port 22
+- If SSH not running: Start service: systemctl start sshd
+- If wrong port: Use -P flag: scp -P 2222 file.txt ...
+
+### Issue 3: Host Key Verification Failed
+
+Error:
+scp file.txt iafzal@192.168.1.100:/home/iafzal/
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+IT IS POSSIBLE THAT SOMEONE IS DOING SOMETHING NASTY!
+
+Cause: Server's SSH key has changed
+
+Legitimate reasons:
+- Server was reinstalled
+- SSH keys were regenerated
+- Different server now using same IP
+
+Malicious reason:
+- Man-in-the-middle attack
+
+Solution:
+
+# Step 1: Verify change is legitimate (contact server admin)
+
+# Step 2: If legitimate, remove old key
+ssh-keygen -R 192.168.1.100
+
+# Or manually edit:
+nano ~/.ssh/known_hosts
+# Delete line with 192.168.1.100
+
+# Step 3: Retry SCP (will prompt to accept new key)
+scp file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Temporary bypass (ONLY for testing, NOT production):
+scp -o StrictHostKeyChecking=no file.txt iafzal@192.168.1.100:/home/iafzal/
+
+### Issue 4: No Such File or Directory
+
+Error:
+scp file.txt iafzal@192.168.1.100:/home/iafzal/nonexistent/
+scp: /home/iafzal/nonexistent/: No such file or directory
+
+Causes:
+
+Cause 1: Destination directory doesn't exist
+Solution:
+# Create directory first
+ssh iafzal@192.168.1.100 "mkdir -p /home/iafzal/nonexistent"
+# Then try SCP again
+scp file.txt iafzal@192.168.1.100:/home/iafzal/nonexistent/
+
+Cause 2: Source file doesn't exist
+Solution:
+# Check file exists locally
+ls -la file.txt
+# Check current directory
+pwd
+
+Cause 3: Typo in path
+Solution:
+# Use tab completion
+scp file.txt iafzal@192.168.1.100:/home/iaf[TAB]
+
+### Issue 5: SCP Stalls or Hangs
+
+Symptoms:
+- SCP starts but shows no progress
+- Transfer appears frozen
+- No error messages
+
+Diagnostic Steps:
+
+# Step 1: Try with verbose mode
+scp -v file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Step 2: Check network connectivity
+ping -c 10 192.168.1.100
+# Look for packet loss
+
+# Step 3: Check if it's a large file issue
+# Try smaller file first
+echo "test" > test.txt
+scp test.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Step 4: Check server load
+ssh iafzal@192.168.1.100 "top -bn1 | head -20"
+
+Solutions:
+
+Solution 1: Network instability
+# Use with compression and lower bandwidth
+scp -C -l 1000 file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Solution 2: MTU issues
+# Lower MTU size
+ssh iafzal@192.168.1.100 "sudo ifconfig eth0 mtu 1400"
+
+Solution 3: Server resource exhaustion
+# Wait or contact admin to free resources
+
+Solution 4: Firewall interference
+# Temporarily disable to test (NOT on production)
+sudo systemctl stop firewalld  # CentOS/RHEL
+sudo ufw disable  # Ubuntu/Debian
+
+### Issue 6: Disk Space Full on Destination
+
+Error:
+scp: /home/iafzal/large_file.iso: No space left on device
+
+Solutions:
+
+# Check disk space on remote server
+ssh iafzal@192.168.1.100 "df -h /home"
+
+# Output:
+# Filesystem      Size  Used Avail Use% Mounted on
+# /dev/sda1       100G   95G  5.0G  95% /home
+
+# Option 1: Clean up space on server
+ssh iafzal@192.168.1.100 "rm -rf /home/iafzal/old_files/*"
+
+# Option 2: Use different destination with more space
+scp large_file.iso iafzal@192.168.1.100:/mnt/backup/
+
+# Option 3: Compress before transfer
+gzip large_file.iso
+scp large_file.iso.gz iafzal@192.168.1.100:/home/iafzal/
+
+### Issue 7: Slow Transfer Speed
+
+Symptoms:
+- Transfer taking much longer than expected
+- Low throughput shown
+
+Diagnostic Steps:
+
+# Check network speed
+iperf -c 192.168.1.100
+
+# Check current transfer speed with verbose
+scp -v file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Solutions:
+
+Solution 1: Enable compression
+scp -C file.txt iafzal@192.168.1.100:/home/iafzal/
+# Good for text files, logs, source code
+# Not helpful for already compressed files (jpg, zip, gz)
+
+Solution 2: Use faster cipher
+scp -c aes128-ctr file.txt iafzal@192.168.1.100:/home/iafzal/
+# aes128-ctr is faster than default
+
+Solution 3: Disable encryption (ONLY on trusted network)
+# Use rsync instead
+rsync -e "ssh -c none -o Compression=no" file.txt iafzal@192.168.1.100:/home/iafzal/
+
+Solution 4: Network congestion
+# Limit bandwidth to be fair to others
+scp -l 5000 file.txt iafzal@192.168.1.100:/home/iafzal/
+# Or transfer during off-hours
+
+Solution 5: Use parallel transfers
+# Split large file and transfer in parallel
+split -b 100M large_file.iso chunk_
+for chunk in chunk_*; do
+  scp $chunk iafzal@192.168.1.100:/tmp/ &
+done
+wait
+# Recombine on server
+ssh iafzal@192.168.1.100 "cat /tmp/chunk_* > /tmp/large_file.iso"
+
+### Issue 8: Cannot Overwrite Existing File
+
+Error:
+scp: /home/iafzal/protected_file.txt: Permission denied
+
+Cause: File exists and you don't have permission to overwrite
+
+Solutions:
+
+# Solution 1: Remove old file first
+ssh iafzal@192.168.1.100 "rm /home/iafzal/protected_file.txt"
+scp protected_file.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Solution 2: Copy with different name
+scp protected_file.txt iafzal@192.168.1.100:/home/iafzal/protected_file_new.txt
+
+# Solution 3: If owned by root, use sudo (if you have access)
+scp protected_file.txt iafzal@192.168.1.100:/tmp/
+ssh iafzal@192.168.1.100 "sudo mv /tmp/protected_file.txt /home/iafzal/"
+
+### Issue 9: Wildcard Not Working
+
+Problem:
+scp *.txt iafzal@192.168.1.100:/home/iafzal/
+# Only transfers first file or gives error
+
+Cause: Remote shell expanding wildcard, not local shell
+
+Solution:
+
+# Solution 1: Quote the wildcard (for remote expansion)
+scp 'iafzal@192.168.1.100:/home/iafzal/*.txt' /local/destination/
+
+# Solution 2: For local wildcard (this is correct for local to remote)
+scp *.txt iafzal@192.168.1.100:/home/iafzal/
+# This should work for local to remote
+
+# Solution 3: Use explicit list
+scp file1.txt file2.txt file3.txt iafzal@192.168.1.100:/home/iafzal/
+
+# Solution 4: Use directory copy
+scp -r /local/dir/*.txt iafzal@192.168.1.100:/home/iafzal/
+
+---
+
+## 10. Quick Reference
+
+### Most Common Commands
+
+Copy file to remote:
+scp file.txt user@host:/path/
+
+Copy file from remote:
+scp user@host:/path/file.txt /local/path/
+
+Copy directory:
+scp -r /local/dir user@host:/remote/dir/
+
+Copy with custom port:
+scp -P 2222 file.txt user@host:/path/
+
+Copy with SSH key:
+scp -i ~/.ssh/key file.txt user@host:/path/
+
+Copy with compression:
+scp -C file.txt user@host:/path/
+
+Copy preserving attributes:
+scp -p file.txt user@host:/path/
+
+Verbose mode:
+scp -v file.txt user@host:/path/
+
+Quiet mode:
+scp -q file.txt user@host:/path/
+
+Limit bandwidth:
+scp -l 1000 file.txt user@host:/path/
+
+### SCP Option Quick Reference
+
+-r : Recursive (copy directories)
+-P : Port number
+-p : Preserve file attributes
+-q : Quiet mode
+-v : Verbose mode
+-C : Enable compression
+-i : Identity file (SSH key)
+-l : Bandwidth limit (Kbit/s)
+-o : SSH options
+-4 : Force IPv4
+-6 : Force IPv6
+
+### Common SCP Patterns
+
+Pattern 1: Backup script
+#!/bin/bash
+scp -r /important/data backup@server:/backups/$(date +%Y%m%d)/
+
+Pattern 2: Deploy script
+#!/bin/bash
+scp -r build/* deploy@production:/var/www/html/
+
+Pattern 3: Download logs
+#!/bin/bash
+scp admin@server:/var/log/app.log /tmp/app_$(date +%Y%m%d).log
+
+Pattern 4: Sync configuration
+#!/bin/bash
+scp /etc/nginx/nginx.conf admin@web1:/etc/nginx/
+scp /etc/nginx/nginx.conf admin@web2:/etc/nginx/
+
+Pattern 5: Collect from multiple servers
+#!/bin/bash
+for server in web1 web2 web3; do
+  scp admin@$server:/var/log/access.log /logs/${server}_access.log
+done
+
+### Essential Troubleshooting Commands
+
+Check SSH connectivity:
+ssh user@host echo "Connection successful"
+
+Check SSH port:
+nc -zv host 22
+
+View SSH debug:
+ssh -vvv user@host
+
+Test SCP with verbose:
+scp -v file.txt user@host:/path/
+
+Check disk space:
+ssh user@host "df -h"
+
+Check permissions:
+ssh user@host "ls -la /path/"
+
+Remove host key:
+ssh-keygen -R hostname
+
+### Security Checklist
+
+□ Use SSH key authentication (not passwords)
+□ Protect private keys with passphrase
+□ Set correct permissions on .ssh directory (700) and keys (600)
+□ Use different keys for different purposes
+□ Regularly rotate SSH keys
+□ Disable password authentication on servers
+□ Change default SSH port
+□ Use firewall to restrict SSH access
+□ Monitor SSH logs for suspicious activity
+□ Remove access for departed users immediately
+□ Use bastion hosts for production servers
+□ Never embed passwords in scripts
+□ Use SSH agent for key management
+□ Verify host key fingerprints on first connection
+□ Keep SSH software updated
+
+### Performance Tips
+
+✓ Use -C for compressing text files
+✓ Use faster cipher for large transfers (-c aes128-ctr)
+✓ Transfer during off-peak hours
+✓ Use compression before transfer (gzip) for very large files
+✓ Consider rsync for repeated syncs
+✓ Use parallel transfers for multiple files
+✓ Check network bandwidth before starting
+✓ Close unnecessary applications during transfer
+✓ Use local network when possible
+✓ Limit bandwidth with -l if needed to avoid congestion
+
+### SCP vs rsync - When to Use What
+
+Use SCP when:
+✓ One-time file transfer
+✓ Simple copy operation
+✓ Small number of files
+✓ Quick transfer needed
+✓ rsync not available
+
+Use rsync when:
+✓ Synchronizing directories
+✓ Repeated transfers
+✓ Large number of files
+✓ Resume capability needed
+✓ Only changed files need transfer
+✓ Detailed progress needed
+
+### Common Mistakes to Avoid
+
+❌ Using same key for everything
+✓ Use separate keys for different servers/purposes
+
+❌ Storing passwords in scripts
+✓ Use SSH keys or credential managers
+
+❌ Not verifying host keys
+✓ Always verify on first connection
+
+❌ Overly permissive key permissions
+✓ Keep keys at 600, .ssh at 700
+
+❌ Not testing in staging first
+✓ Always test commands in safe environment
+
+❌ Forgetting trailing slash on directories
+✓ scp -r dir/ vs scp -r dir (different behavior)
+
+❌ Not monitoring disk space before transfer
+✓ Check available space: df -h
+
+❌ Using SCP for large recurring syncs
+✓ Use rsync for better efficiency
+
+❌ Not using compression for appropriate files
+✓ Use -C for text files, logs, source code
+
+❌ Hardcoding paths and hostnames
+✓ Use variables and configuration files
+
+---
+
+## 11. Conclusion
+
+### Key Takeaways
+
+1. **SCP = Secure + Simple**
+   - Built on SSH (port 22)
+   - Encrypted by default
+   - Simple command-line interface
+   - No additional setup required (if SSH works)
+
+2. **Basic Syntax Pattern**
+   scp [options] source destination
+   - Local to Remote: scp file user@host:/path/
+   - Remote to Local: scp user@host:/file /local/
+   - Remote to Remote: scp user1@host1:/file user2@host2:/path/
+
+3. **Essential Options**
+   - `-r`: Copy directories recursively
+   - `-P`: Specify custom port
+   - `-i`: Use specific SSH key
+   - `-C`: Enable compression
+   - `-v`: Verbose (debugging)
+
+4. **Security First**
+   - Always use SSH keys (not passwords)
+   - Verify host keys on first connection
+   - Proper file permissions (600 for keys, 700 for .ssh)
+   - Monitor and log access
+   - Regular security audits
+
+5. **Choose Right Tool**
+   - SCP: Simple one-time transfers
+   - SFTP: Interactive file management
+   - rsync: Regular syncs, large transfers
+   - Never FTP (unencrypted)
+
+### Real-World Applications
+
+✓ DevOps: Deploy code to servers
+✓ System Admin: Backup and restore
+✓ Database Admin: Transfer database dumps
+✓ Security: Collect logs and evidence
+✓ Development: Share files with team
+✓ Data Migration: Move data between servers
+✓ Automation: Scheduled file transfers
+✓ Disaster Recovery: Emergency restores
+
+### Best Practices Summary
+
+1. Use SSH config for frequently accessed servers
+2. Implement key-based authentication everywhere
+3. Test commands in staging before production
+4. Monitor transfer progress for large files
+5. Verify transfers completed successfully
+6. Clean up temporary files after transfer
+7. Document your SCP procedures
+8. Automate repetitive tasks with scripts
+9. Always have a backup plan
+10. Keep learning and improving your workflow
+
+### Next Steps
+
+To master SCP:
+1. Practice basic commands daily
+2. Create automation scripts
+3. Learn SSH advanced features
+4. Explore rsync for complex scenarios
+5. Implement security best practices
+6. Join Linux/DevOps communities
+7. Read man pages: man scp
+8. Study real-world case studies
+9. Build personal projects using SCP
+10. Share knowledge with colleagues
+
+### Additional Resources
+
+Man pages:
+man scp
+man ssh
+man ssh-keygen
+man ssh-copy-id
+
+Online resources:
+- SSH.com documentation
+- DigitalOcean tutorials
+- Linux Foundation guides
+- Stack Overflow community
+
+Related commands to learn:
+- ssh: Remote login
+- rsync: Advanced sync
+- sftp: Interactive file transfer
+- ssh-agent: Key management
+- sshfs: Mount remote filesystem
+- nc (netcat): Network debugging
+- telnet: Port testing
+
+---
+
+## Author Information
+Content based on: Imran Afzal's Tutorial
+Website: www.utclisolutions.com
+
+Thank you for learning about SCP!
+For more Linux and DevOps tutorials, visit the website.
+
+---
+
+## Appendix: Complete Example Scenarios
+
+### Example 1: Complete Backup Solution
+
+#!/bin/bash
+# Daily backup script using SCP
+
+BACKUP_DATE=$(date +%Y%m%d)
+SOURCE_DIR="/home/iafzal/important_data"
+BACKUP_USER="backup"
+BACKUP_SERVER="backup.company.com"
+BACKUP_PATH="/backups/iafzal"
+LOG_FILE="/var/log/backup.log"
+
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a $LOG_FILE
+}
+
+log "=== Starting backup ==="
+
+# Create local archive
+log "Creating archive..."
+tar -czf /tmp/backup_${BACKUP_DATE}.tar.gz $SOURCE_DIR
+
+# Check if archive created successfully
+if [ ! -f /tmp/backup_${BACKUP_DATE}.tar.gz ]; then
+  log "ERROR: Failed to create archive"
+  exit 1
+fi
+
+# Get archive size
+SIZE=$(du -h /tmp/backup_${BACKUP_DATE}.tar.gz | cut -f1)
+log "Archive size: $SIZE"
+
+# Transfer to backup server
+log "Transferring to backup server..."
+scp -i ~/.ssh/backup_key /tmp/backup_${BACKUP_DATE}.tar.gz \
+    ${BACKUP_USER}@${BACKUP_SERVER}:${BACKUP_PATH}/
+
+# Check if transfer successful
+if [ $? -eq 0 ]; then
+  log "✓ Backup successful"
+  
+  # Verify file exists on remote server
+  ssh -i ~/.ssh/backup_key ${BACKUP_USER}@${BACKUP_SERVER} \
+      "ls -lh ${BACKUP_PATH}/backup_${BACKUP_DATE}.tar.gz"
+  
+  # Cleanup local archive
+  rm /tmp/backup_${BACKUP_DATE}.tar.gz
+  log "✓ Local cleanup complete"
+else
+  log "✗ Backup failed"
+  exit 1
+fi
+
+# Remove backups older than 30 days from remote server
+log "Cleaning old backups..."
+ssh -i ~/.ssh/backup_key ${BACKUP_USER}@${BACKUP_SERVER} \
+    "find ${BACKUP_PATH} -name 'backup_*.tar.gz' -mtime +30 -delete"
+
+log "=== Backup complete ==="
+
+### Example 2: Multi-Server Deployment
+
+#!/bin/bash
+# Deploy application to multiple web servers
+
+APP_VERSION="v1.2.3"
+BUILD_DIR="/home/iafzal/myapp/build"
+DEPLOY_USER="deploy"
+DEPLOY_PATH="/var/www/html"
+SERVERS=("web1.company.com" "web2.company.com" "web3.company.com")
+
+echo "=== Deploying $APP_VERSION to ${#SERVERS[@]} servers ==="
+
+# Build application
+echo "Building application..."
+cd /home/iafzal/myapp
+npm run build
+
+# Check if build successful
+if [ ! -d "$BUILD_DIR" ]; then
+  echo "ERROR: Build failed"
+  exit 1
+fi
+
+# Deploy to each server
+DEPLOYED=0
+FAILED=0
+
+for server in "${SERVERS[@]}"; do
+  echo ""
+  echo "Deploying to $server..."
+  
+  # Backup current version
+  ssh ${DEPLOY_USER}@${server} \
+      "tar -czf /tmp/backup_before_${APP_VERSION}.tar.gz ${DEPLOY_PATH}"
+  
+  # Deploy new version
+  scp -r ${BUILD_DIR}/* ${DEPLOY_USER}@${server}:${DEPLOY_PATH}/
+  
+  if [ $? -eq 0 ]; then
+    # Restart application
+    ssh ${DEPLOY_USER}@${server} "systemctl restart web-app"
+    
+    # Health check
+    sleep 5
+    HEALTH=$(ssh ${DEPLOY_USER}@${server} "curl -s -o /dev/null -w '%{http_code}' http://localhost/health")
+    
+    if [ "$HEALTH" == "200" ]; then
+      echo "✓ $server - SUCCESS (Health: $HEALTH)"
+      ((DEPLOYED++))
+    else
+      echo "✗ $server - FAILED (Health check failed: $HEALTH)"
+      echo "  Rolling back..."
+      ssh ${DEPLOY_USER}@${server} \
+          "tar -xzf /tmp/backup_before_${APP_VERSION}.tar.gz -C /"
+      ssh ${DEPLOY_USER}@${server} "systemctl restart web-app"
+      ((FAILED++))
+    fi
+  else
+    echo "✗ $server - FAILED (Transfer error)"
+    ((FAILED++))
+  fi
+done
+
+echo ""
+echo "=== Deployment Summary ==="
+echo "Deployed successfully: $DEPLOYED"
+echo "Failed: $FAILED"
+echo "=========================="
+
+if [ $FAILED -eq 0 ]; then
+  echo "✓ All servers deployed successfully!"
+  exit 0
+else
+  echo "✗ Some servers failed to deploy"
+  exit 1
+fi
