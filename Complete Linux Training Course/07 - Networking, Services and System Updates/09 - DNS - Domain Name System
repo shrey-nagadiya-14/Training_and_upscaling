@@ -1,0 +1,2344 @@
+# DNS (Domain Name System) - Complete Guide
+
+## Table of Contents
+1. [What is DNS?](#what-is-dns)
+2. [DNS Components and Architecture](#dns-components-and-architecture)
+3. [DNS Record Types](#dns-record-types)
+4. [DNS Installation and Configuration](#dns-installation-and-configuration)
+5. [Zone Files Explained](#zone-files-explained)
+6. [DNS Server Management](#dns-server-management)
+7. [Daily Use Cases](#daily-use-cases)
+8. [Real-Life Examples](#real-life-examples)
+9. [Troubleshooting](#troubleshooting)
+10. [Best Practices](#best-practices)
+
+---
+
+## 1. What is DNS?
+
+### Definition
+**DNS = Domain Name System**
+
+DNS is like the "phonebook of the internet" that translates human-readable domain names (like www.google.com) into machine-readable IP addresses (like 142.250.185.46).
+
+### Why DNS is Important
+Without DNS, you would need to remember:
+- 142.250.185.46 instead of google.com
+- 157.240.241.35 instead of facebook.com
+- 204.79.197.200 instead of bing.com
+
+This would be impossible for billions of websites!
+
+### DNS Purpose
+
+DNS performs three main functions:
+
+1. **Hostname to IP Address (A Record)**
+   - Translates: www.google.com → 142.250.185.46
+   - Most common DNS lookup
+   - Used when you type a website address in your browser
+
+2. **IP Address to Hostname (PTR Record)**
+   - Translates: 142.250.185.46 → www.google.com
+   - Used for reverse lookups
+   - Common in email server verification
+
+3. **Hostname to Hostname (CNAME Record)**
+   - Translates: blog.example.com → www.example.com
+   - Creates aliases for domains
+   - Used for service redirection
+
+### How DNS Works (Simple Flow)
+
+Step 1: User types www.google.com in browser
+        ↓
+Step 2: Browser checks local DNS cache
+        ↓ (if not found)
+Step 3: Query sent to configured DNS server (e.g., 8.8.8.8)
+        ↓
+Step 4: DNS server looks up the domain
+        ↓
+Step 5: Returns IP address (142.250.185.46)
+        ↓
+Step 6: Browser connects to that IP address
+
+### DNS Hierarchy
+
+                    Root DNS Servers (.)
+                           |
+        +------------------+------------------+
+        |                  |                  |
+    .com TLD           .org TLD          .net TLD
+        |                  |                  |
+    google.com         wikipedia.org      github.net
+        |
+   www.google.com
+
+---
+
+## 2. DNS Components and Architecture
+
+### DNS Server Types
+
+#### 1. Master DNS Server (Primary Server)
+- Contains the original zone file
+- Authoritative source of DNS data
+- All changes made here first
+- Example: Your company's main DNS server
+
+#### 2. Slave DNS Server (Secondary Server)
+- Gets zone data from Master server
+- Provides redundancy and load balancing
+- Read-only copy of zone files
+- Automatically syncs with Master
+
+#### 3. Client
+- End-user computers/devices
+- Sends DNS queries to DNS servers
+- Caches DNS responses locally
+
+### DNS Software: BIND
+
+**BIND** = Berkeley Internet Name Domain
+
+- Most widely used DNS server software on Linux
+- Open-source and free
+- Developed by Internet Systems Consortium (ISC)
+- Supports both IPv4 and IPv6
+
+### DNS Files and Directories
+
+| File/Directory | Purpose |
+|----------------|---------|
+| /etc/named.conf | Main DNS configuration file |
+| /var/named/ | Directory containing zone files |
+| /var/named/forward.lab | Forward zone file (hostname to IP) |
+| /var/named/reverse.lab | Reverse zone file (IP to hostname) |
+| /etc/named.rfc1912.zones | Zone definitions |
+| /etc/named.root.key | DNSSEC root key |
+
+### DNS Service
+
+Service Name: **named**
+RPM Package: **bind**
+
+Commands:
+systemctl start named      # Start DNS service
+systemctl stop named       # Stop DNS service
+systemctl restart named    # Restart DNS service
+systemctl enable named     # Enable at boot
+systemctl status named     # Check status
+
+### DNS Ports
+
+| Port | Protocol | Purpose |
+|------|----------|---------|
+| 53 | UDP | DNS queries (default, faster) |
+| 53 | TCP | Zone transfers, large responses |
+| 953 | TCP | rndc remote administration |
+
+---
+
+## 3. DNS Record Types
+
+### A Record (Address Record)
+**Purpose:** Maps hostname to IPv4 address
+
+Format:
+hostname IN A ip-address
+
+Examples:
+www          IN A    192.168.1.100
+mail         IN A    192.168.1.200
+ftp          IN A    192.168.1.150
+
+Real-Life Usage:
+- When user types www.example.com
+- DNS returns 192.168.1.100
+- Browser connects to that IP
+
+### AAAA Record (IPv6 Address Record)
+**Purpose:** Maps hostname to IPv6 address
+
+Format:
+hostname IN AAAA ipv6-address
+
+Example:
+www          IN AAAA  2001:0db8:85a3::8a2e:0370:7334
+
+### PTR Record (Pointer Record)
+**Purpose:** Maps IP address to hostname (Reverse DNS)
+
+Format:
+last-ip-digit IN PTR fqdn-of-system
+
+Examples:
+100    IN PTR    www.example.com.
+200    IN PTR    mail.example.com.
+150    IN PTR    ftp.example.com.
+
+Real-Life Usage:
+- Email servers verify sender's domain
+- Security logging and tracking
+- Network diagnostics
+
+### CNAME Record (Canonical Name)
+**Purpose:** Creates an alias (one hostname points to another)
+
+Format:
+alias-name IN CNAME real-name
+
+Examples:
+blog         IN CNAME    www.example.com.
+shop         IN CNAME    www.example.com.
+ftp          IN CNAME    server1.example.com.
+
+Real-Life Usage:
+- Multiple names for same server
+- Service migration without changing DNS
+- CDN implementations
+
+Important: CNAME cannot point to another CNAME (no chains allowed)
+
+### NS Record (Name Server)
+**Purpose:** Specifies authoritative DNS servers for the domain
+
+Format:
+IN NS nameserver-name
+
+Examples:
+@            IN NS     ns1.example.com.
+@            IN NS     ns2.example.com.
+
+Real-Life Usage:
+- Defines which servers handle DNS for domain
+- Required for domain delegation
+- Load balancing DNS queries
+
+### MX Record (Mail Exchange)
+**Purpose:** Specifies mail servers for the domain
+
+Format:
+IN MX preference-value email-server-name
+
+Examples:
+@    IN MX 10    mail1.example.com.
+@    IN MX 20    mail2.example.com.
+@    IN MX 30    mail3.example.com.
+
+Priority: Lower number = higher priority
+- Mail server with priority 10 tried first
+- If it fails, try priority 20
+- Then priority 30
+
+Real-Life Usage:
+- Email delivery routing
+- Email failover and redundancy
+- Load balancing email traffic
+
+### SOA Record (Start of Authority)
+**Purpose:** Contains critical information about the zone
+
+Format:
+@ IN SOA primary-name-server hostmaster-email (
+        serial-number    ; Serial
+        refresh          ; Refresh
+        retry            ; Retry
+        expire           ; Expire
+        minimum-TTL )    ; Minimum TTL
+
+Example:
+$TTL 86400
+@ IN SOA masterdns.lab.local. root.lab.local. (
+        2011071001 ; Serial
+        3600       ; Refresh (1 hour)
+        1800       ; Retry (30 minutes)
+        604800     ; Expire (1 week)
+        86400 )    ; Minimum TTL (1 day)
+
+SOA Fields Explained:
+
+1. Primary Name Server: masterdns.lab.local.
+   - Main DNS server for this zone
+
+2. Hostmaster Email: root.lab.local.
+   - Contact email (@ replaced with .)
+   - root.lab.local = root@lab.local
+
+3. Serial Number: 2011071001
+   - Version number of zone file
+   - Format: YYYYMMDDNN (Year/Month/Day/Revision)
+   - MUST increase when zone file changes
+   - Slave servers check this to know when to update
+
+4. Refresh: 3600 seconds (1 hour)
+   - How often slave checks for updates
+
+5. Retry: 1800 seconds (30 minutes)
+   - If refresh fails, retry after this time
+
+6. Expire: 604800 seconds (1 week)
+   - If master unreachable, slave stops answering after this
+
+7. Minimum TTL: 86400 seconds (1 day)
+   - How long negative responses are cached
+
+Time Conversion Table:
+60 seconds = 1M (1 minute)
+1800 seconds = 30M (30 minutes)
+3600 seconds = 1H (1 hour)
+10800 seconds = 3H (3 hours)
+21600 seconds = 6H (6 hours)
+43200 seconds = 12H (12 hours)
+86400 seconds = 1D (1 day)
+259200 seconds = 3D (3 days)
+604800 seconds = 1W (1 week)
+31536000 seconds = 365D (1 year)
+
+### TXT Record (Text Record)
+**Purpose:** Stores text information
+
+Examples:
+@    IN TXT    "v=spf1 include:_spf.google.com ~all"
+@    IN TXT    "google-site-verification=abc123def456"
+
+Real-Life Usage:
+- SPF records for email authentication
+- Domain verification
+- DKIM signatures
+
+### Other Record Types
+
+| Record | Purpose |
+|--------|---------|
+| RP | Contact person for this zone |
+| WKS | Well-known services |
+| HINFO | Host information |
+| SRV | Service location |
+
+---
+
+## 4. DNS Installation and Configuration
+
+### System Setup Information
+
+Before starting, gather:
+- Domain Name: lab.local
+- IP Address: Your server's IP (e.g., 192.168.1.29)
+- Hostname: masterdns.lab.local
+- Network: 192.168.1.0/24
+
+### Step-by-Step Installation
+
+#### Step 1: Create VM Snapshot
+# Create snapshot before making changes
+# In case something goes wrong, you can revert
+
+Recommendation: Always snapshot before major system changes!
+
+#### Step 2: Install DNS Package
+
+# Install BIND and utilities
+yum install bind bind-utils -y
+
+Packages installed:
+- bind: Main DNS server software
+- bind-utils: DNS testing tools (dig, nslookup, host)
+
+#### Step 3: Configure Main DNS File (/etc/named.conf)
+
+# Backup original file
+cp /etc/named.conf /etc/named.conf.backup
+
+# Edit configuration
+vi /etc/named.conf
+
+Changes to make:
+
+1. Edit the listen-on directive:
+   Find:
+   listen-on port 53 { 127.0.0.1; };
+   
+   Change to:
+   listen-on port 53 { 127.0.0.1; 192.168.1.29; };
+   
+   This allows DNS to listen on your server's IP
+
+2. Add allow-query (if not present):
+   allow-query { any; };
+   
+   This allows any client to query your DNS
+
+3. Go to bottom of file, before "include" lines, add zones:
+
+zone "lab.local" IN {
+    type master;
+    file "forward.lab";
+    allow-update { none; };
+};
+
+zone "1.168.192.in-addr.arpa" IN {
+    type master;
+    file "reverse.lab";
+    allow-update { none; };
+};
+
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";
+
+Note: 1.168.192 is reverse of 192.168.1 network
+
+Full Example of /etc/named.conf:
+
+options {
+    listen-on port 53 { 127.0.0.1; 192.168.1.29; };
+    listen-on-v6 port 53 { ::1; };
+    directory       "/var/named";
+    dump-file       "/var/named/data/cache_dump.db";
+    statistics-file "/var/named/data/named_stats.txt";
+    memstatistics-file "/var/named/data/named_mem_stats.txt";
+    allow-query     { any; };
+    recursion yes;
+    dnssec-enable yes;
+    dnssec-validation yes;
+    managed-keys-directory "/var/named/dynamic";
+    pid-file "/run/named/named.pid";
+    session-keyfile "/run/named/session.key";
+};
+
+logging {
+    channel default_debug {
+        file "data/named.run";
+        severity dynamic;
+    };
+};
+
+zone "." IN {
+    type hint;
+    file "named.ca";
+};
+
+zone "lab.local" IN {
+    type master;
+    file "forward.lab";
+    allow-update { none; };
+};
+
+zone "1.168.192.in-addr.arpa" IN {
+    type master;
+    file "reverse.lab";
+    allow-update { none; };
+};
+
+include "/etc/named.rfc1912.zones";
+include "/etc/named.root.key";
+
+#### Step 4: Create Zone Files
+
+# Navigate to zone directory
+cd /var/named
+
+# Create forward zone file
+touch forward.lab
+
+# Create reverse zone file
+touch reverse.lab
+
+# Set proper permissions
+chgrp named forward.lab reverse.lab
+chmod 640 forward.lab reverse.lab
+
+#### Step 5: Configure Forward Zone File
+
+# Edit forward zone file
+vi /var/named/forward.lab
+
+Content:
+
+$TTL 86400
+@   IN SOA  masterdns.lab.local. root.lab.local. (
+        2011071001 ;Serial
+        3600       ;Refresh
+        1800       ;Retry
+        604800     ;Expire
+        86400 )    ;Minimum TTL
+
+; Name Server Information
+@       IN  NS      masterdns.lab.local.
+
+; IP address of Name Server
+masterdns       IN  A       192.168.1.29
+
+; Mail Exchanger
+@       IN  MX 10   mail.lab.local.
+
+; A Records (Hostname to IP)
+www             IN  A       192.168.1.100
+mail            IN  A       192.168.1.200
+ftp             IN  A       192.168.1.150
+clienta         IN  A       192.168.1.240
+clientb         IN  A       192.168.1.241
+
+; CNAME Records (Aliases)
+blog            IN  CNAME   www.lab.local.
+shop            IN  CNAME   www.lab.local.
+
+Explanation:
+- $TTL: Default time to live (how long to cache)
+- @: Represents the domain name (lab.local)
+- SOA: Start of Authority record
+- NS: Name server for this domain
+- A: Maps hostname to IP
+- MX: Mail server with priority 10
+- CNAME: Aliases pointing to other hostnames
+
+#### Step 6: Configure Reverse Zone File
+
+# Edit reverse zone file
+vi /var/named/reverse.lab
+
+Content:
+
+$TTL 86400
+@   IN SOA  masterdns.lab.local. root.lab.local. (
+        2011071001 ;Serial
+        3600       ;Refresh
+        1800       ;Retry
+        604800     ;Expire
+        86400 )    ;Minimum TTL
+
+; Name Server Information
+@       IN  NS      masterdns.lab.local.
+
+; Reverse DNS (PTR Records)
+@ IN PTR lab.local.
+masterdns       IN  A       192.168.1.29
+
+; PTR Records (IP to Hostname)
+29      IN  PTR     masterdns.lab.local.
+100     IN  PTR     www.lab.local.
+200     IN  PTR     mail.lab.local.
+150     IN  PTR     ftp.lab.local.
+240     IN  PTR     clienta.lab.local.
+241     IN  PTR     clientb.lab.local.
+
+Explanation:
+- Reverse zone maps IP to hostname
+- Only last octet of IP is used (29, 100, 200, etc.)
+- PTR records must end with a dot (.)
+
+#### Step 7: Disable Firewall (Lab Environment Only)
+
+# Stop firewall
+systemctl stop firewalld
+
+# Disable firewall at boot
+systemctl disable firewalld
+
+Production Note: In production, configure firewall properly:
+firewall-cmd --permanent --add-service=dns
+firewall-cmd --reload
+
+#### Step 8: Set Proper Permissions and Ownership
+
+# Change ownership
+chgrp named -R /var/named
+chown -v root:named /etc/named.conf
+
+# Set correct permissions
+restorecon -rv /var/named
+restorecon /etc/named.conf
+
+SELinux Note: restorecon restores proper SELinux context
+
+#### Step 9: Test Configuration Syntax
+
+# Check named.conf syntax
+named-checkconf /etc/named.conf
+
+# Check forward zone file
+named-checkzone lab.local /var/named/forward.lab
+
+Expected output:
+zone lab.local/IN: loaded serial 2011071001
+OK
+
+# Check reverse zone file
+named-checkzone lab.local /var/named/reverse.lab
+
+Expected output:
+zone lab.local/IN: loaded serial 2011071001
+OK
+
+If no output: Configuration is correct
+If errors shown: Fix the syntax errors before proceeding
+
+#### Step 10: Add DNS Server to Network Configuration
+
+# Edit network configuration
+vi /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+Add this line:
+DNS1=192.168.1.29
+
+Or use:
+echo "DNS1=192.168.1.29" >> /etc/sysconfig/network-scripts/ifcfg-enp0s3
+
+#### Step 11: Modify /etc/resolv.conf
+
+# Edit resolv.conf
+vi /etc/resolv.conf
+
+Set nameserver:
+nameserver 192.168.1.29
+
+Or use:
+echo "nameserver 192.168.1.29" > /etc/resolv.conf
+
+Note: This file is often auto-generated. Changes may be overwritten.
+Permanent changes should be in network-scripts.
+
+#### Step 12: Start DNS Service
+
+# Start and enable named service
+systemctl start named
+systemctl enable named
+
+# Check status
+systemctl status named
+
+Expected output:
+● named.service - Berkeley Internet Name Domain (DNS)
+   Loaded: loaded (/usr/lib/systemd/system/named.service; enabled)
+   Active: active (running) since...
+
+#### Step 13: Restart Network Service
+
+# Restart network to apply changes
+systemctl restart network
+
+Or in newer systems:
+nmcli connection reload
+
+#### Step 14: Test DNS Server
+
+Now test your DNS configuration:
+
+# Test forward lookup (hostname to IP)
+dig masterdns.lab.local
+
+Expected output:
+;; ANSWER SECTION:
+masterdns.lab.local.    86400   IN  A   192.168.1.29
+
+# Test using nslookup
+nslookup masterdns.lab.local
+
+Expected output:
+Server:     192.168.1.29
+Address:    192.168.1.29#53
+
+Name:   masterdns.lab.local
+Address: 192.168.1.29
+
+# Test www record
+nslookup www.lab.local
+
+Expected output:
+Server:     192.168.1.29
+Address:    192.168.1.29#53
+
+Name:   www.lab.local
+Address: 192.168.1.100
+
+# Test reverse lookup (IP to hostname)
+nslookup 192.168.1.240
+
+Expected output:
+Server:     192.168.1.29
+Address:    192.168.1.29#53
+
+240.1.168.192.in-addr.arpa  name = clienta.lab.local.
+
+# Test client B
+nslookup clientb.lab.local
+
+Expected output:
+Server:     192.168.1.29
+Address:    192.168.1.29#53
+
+Name:   clientb.lab.local
+Address: 192.168.1.241
+
+# Test IP resolution
+nslookup 192.168.1.241
+
+Expected output:
+Server:     192.168.1.29
+Address:    192.168.1.29#53
+
+241.1.168.192.in-addr.arpa  name = clientb.lab.local.
+
+---
+
+## 5. Zone Files Explained
+
+### What is a Zone File?
+
+A zone file contains the actual DNS data:
+- IP addresses
+- Hostnames
+- Mail servers
+- Name servers
+- All DNS records for a domain
+
+### Zone File Types
+
+#### Forward Zone File
+- Maps: Hostname → IP Address
+- File: /var/named/forward.lab
+- Used for: Normal DNS lookups
+- Example: www.lab.local → 192.168.1.100
+
+#### Reverse Zone File
+- Maps: IP Address → Hostname
+- File: /var/named/reverse.lab
+- Used for: Reverse DNS lookups
+- Example: 192.168.1.100 → www.lab.local
+
+### Zone File Structure
+
+Basic structure:
+1. TTL directive
+2. SOA record
+3. NS records
+4. A records (or PTR for reverse)
+5. Other records (MX, CNAME, etc.)
+
+### Important Zone File Rules
+
+1. Every domain name ending must have a dot (.)
+   Correct: masterdns.lab.local.
+   Wrong: masterdns.lab.local
+
+2. If no dot at end, domain name is appended
+   www → www.lab.local
+   www. → www. (stays as is)
+
+3. @ symbol represents the domain itself
+   @ = lab.local
+
+4. Comments start with semicolon (;)
+   ; This is a comment
+
+5. Serial number MUST increase when file changes
+   Old: 2011071001
+   New: 2011071002
+
+### Sample Complete Zone File
+
+$ORIGIN example.com.
+$TTL 86400
+
+@ IN SOA ns1.example.com. admin.example.com. (
+        2025112401 ; Serial (YYYYMMDDNN)
+        3600       ; Refresh (1 hour)
+        1800       ; Retry (30 min)
+        604800     ; Expire (1 week)
+        86400 )    ; Minimum (1 day)
+
+; Name Servers
+        IN NS       ns1.example.com.
+        IN NS       ns2.example.com.
+
+; Mail Servers
+        IN MX 10    mail1.example.com.
+        IN MX 20    mail2.example.com.
+
+; A Records
+ns1     IN A        10.0.1.1
+ns2     IN A        10.0.1.2
+www     IN A        10.0.1.10
+mail1   IN A        10.0.1.20
+mail2   IN A        10.0.1.21
+ftp     IN A        10.0.1.30
+
+; CNAME Records
+blog    IN CNAME    www.example.com.
+shop    IN CNAME    www.example.com.
+
+; TXT Records
+@       IN TXT      "v=spf1 mx -all"
+
+---
+
+## 6. DNS Server Management
+
+### Using the rndc Utility
+
+**rndc** = Remote Name Daemon Control
+
+Purpose: Manage named service locally or remotely
+
+Configuration File: /etc/rndc.conf
+Key File: /etc/rndc.key (auto-generated during install)
+
+#### rndc Commands
+
+Check Service Status:
+rndc status
+
+Output shows:
+- version
+- CPUs found
+- worker threads
+- UDP listeners
+- TCP clients
+- zones loaded
+- queries received
+
+Reload Configuration:
+rndc reload
+
+- Reloads named.conf
+- Reloads all zone files
+- Does NOT disconnect clients
+- No service interruption
+
+Reload Specific Zone:
+rndc reload example.com
+
+- Only reloads specified zone
+- Faster than full reload
+- Use after zone file changes
+
+Reload Only New Zones:
+rndc reconfig
+
+- Loads newly added zones
+- Does NOT reload existing zones
+- Use after adding new zone to named.conf
+
+Flush Cache:
+rndc flush
+
+- Clears DNS cache
+- Forces fresh lookups
+- Use when testing changes
+
+Dump Cache to File:
+rndc dumpdb
+
+- Saves cache to /var/named/data/cache_dump.db
+- Useful for debugging
+
+Query Log Control:
+rndc querylog on     # Enable query logging
+rndc querylog off    # Disable query logging
+
+View Statistics:
+rndc stats
+
+- Creates statistics file
+- Location: /var/named/data/named_stats.txt
+
+Stop Named Service:
+rndc stop
+
+- Gracefully stops named
+- Better than systemctl stop (cleaner shutdown)
+
+### Monitoring DNS Server
+
+#### Check Service Status
+systemctl status named
+
+#### View Logs
+# Real-time log monitoring
+tail -f /var/log/messages | grep named
+
+# View all named logs
+journalctl -u named
+
+# View recent logs
+journalctl -u named -n 50
+
+#### Check DNS Port
+# Check if DNS is listening on port 53
+netstat -tulpn | grep :53
+
+Expected output:
+tcp    0   0 192.168.1.29:53    0.0.0.0:*    LISTEN    1234/named
+udp    0   0 192.168.1.29:53    0.0.0.0:*              1234/named
+
+Or using ss:
+ss -tulpn | grep :53
+
+#### Check Configuration Syntax
+named-checkconf /etc/named.conf
+named-checkzone example.com /var/named/example.com.zone
+
+### DNS Query Tools
+
+#### 1. dig (Domain Information Groper)
+Most powerful DNS troubleshooting tool
+
+Basic query:
+dig example.com
+
+Specific query type:
+dig example.com A        # A record
+dig example.com MX       # Mail servers
+dig example.com NS       # Name servers
+dig example.com SOA      # Start of Authority
+dig example.com ANY      # All records
+
+Query specific DNS server:
+dig @8.8.8.8 example.com
+
+Short output:
+dig +short example.com
+
+Reverse lookup:
+dig -x 192.168.1.100
+
+Trace DNS path:
+dig +trace example.com
+
+#### 2. nslookup (Name Server Lookup)
+Interactive DNS query tool
+
+Basic query:
+nslookup example.com
+
+Query specific server:
+nslookup example.com 8.8.8.8
+
+Interactive mode:
+nslookup
+> set type=MX
+> example.com
+> set type=NS
+> example.com
+> exit
+
+#### 3. host
+Simple DNS lookup tool
+
+Basic query:
+host example.com
+
+Query specific type:
+host -t MX example.com
+host -t NS example.com
+
+Reverse lookup:
+host 192.168.1.100
+
+#### 4. ping
+Test DNS resolution and connectivity:
+ping example.com
+
+Shows resolved IP:
+PING example.com (192.168.1.100) 56(84) bytes of data.
+
+---
+
+## 7. Daily Use Cases
+
+### Use Case 1: Setting Up Internal Company DNS
+
+Scenario: Company has 200 employees, need internal DNS for:
+- Intranet website
+- Email server
+- File server
+- Development servers
+
+Solution:
+
+1. Setup DNS server with domain: company.internal
+
+2. Create zone file:
+$TTL 86400
+@ IN SOA dns1.company.internal. admin.company.internal. (
+        2025112401 ;Serial
+        3600       ;Refresh
+        1800       ;Retry
+        604800     ;Expire
+        86400 )    ;Minimum
+
+; Name Servers
+@               IN NS       dns1.company.internal.
+@               IN NS       dns2.company.internal.
+
+; Mail Server
+@               IN MX 10    mail.company.internal.
+
+; Servers
+dns1            IN A        10.0.0.10
+dns2            IN A        10.0.0.11
+intranet        IN A        10.0.0.20
+mail            IN A        10.0.0.30
+fileserver      IN A        10.0.0.40
+dev1            IN A        10.0.0.50
+dev2            IN A        10.0.0.51
+
+; Aliases
+www             IN CNAME    intranet.company.internal.
+webmail         IN CNAME    mail.company.internal.
+files           IN CNAME    fileserver.company.internal.
+
+3. Configure all workstations to use 10.0.0.10 as DNS
+
+4. Employees can now access:
+   - intranet.company.internal
+   - mail.company.internal
+   - fileserver.company.internal
+
+Benefits:
+- No need to remember IP addresses
+- Easy to migrate services (change IP in DNS only)
+- Professional internal infrastructure
+- Centralized management
+
+### Use Case 2: Web Hosting Company - Multiple Domains
+
+Scenario: Hosting company manages 50+ customer domains
+
+Challenge: Each domain needs:
+- www record pointing to web server
+- Mail server configuration
+- FTP access
+- Subdomains
+
+Solution: Create zone for each domain
+
+Example for customer1.com:
+$TTL 86400
+@ IN SOA ns1.hostingcompany.com. admin.customer1.com. (
+        2025112401
+        3600
+        1800
+        604800
+        86400 )
+
+; Use hosting company's name servers
+@       IN NS       ns1.hostingcompany.com.
+@       IN NS       ns2.hostingcompany.com.
+
+; Web server
+@       IN A        203.0.113.10
+www     IN A        203.0.113.10
+
+; Mail
+@       IN MX 10    mail.customer1.com.
+mail    IN A        203.0.113.20
+
+; FTP
+ftp     IN A        203.0.113.30
+
+; Subdomains
+blog    IN A        203.0.113.11
+shop    IN A        203.0.113.12
+api     IN A        203.0.113.13
+
+Automation:
+- Script to automatically create zone files
+- Template-based zone creation
+- Automated testing of new zones
+
+### Use Case 3: Load Balancing with DNS
+
+Scenario: High-traffic website needs load balancing
+
+Solution: Multiple A records for same hostname
+
+Zone file:
+www     IN A        203.0.113.10
+www     IN A        203.0.113.11
+www     IN A        203.0.113.12
+
+How it works:
+- DNS returns all three IPs
+- Client picks one (usually first)
+- DNS rotates order (round-robin)
+- Distributes traffic across servers
+
+Testing:
+dig www.example.com
+
+; ANSWER SECTION:
+www.example.com.    300    IN    A    203.0.113.10
+www.example.com.    300    IN    A    203.0.113.11
+www.example.com.    300    IN    A    203.0.113.12
+
+Next query might return different order:
+www.example.com.    300    IN    A    203.0.113.11
+www.example.com.    300    IN    A    203.0.113.12
+www.example.com.    300    IN    A    203.0.113.10
+
+### Use Case 4: Email Server Setup with DNS
+
+Scenario: Setting up email server for company.com
+
+Required DNS records:
+
+1. MX Record (Mail Exchange):
+@       IN MX 10    mail.company.com.
+
+2. A Record for mail server:
+mail    IN A        203.0.113.50
+
+3. PTR Record (Reverse DNS):
+In reverse zone (113.0.203.in-addr.arpa):
+50      IN PTR      mail.company.com.
+
+4. SPF Record (Sender Policy Framework):
+@       IN TXT      "v=spf1 mx ip4:203.0.113.50 -all"
+
+5. DKIM Record:
+default._domainkey  IN TXT  "v=DKIM1; k=rsa; p=MIGfMA0GCS..."
+
+6. DMARC Record:
+_dmarc  IN TXT      "v=DMARC1; p=quarantine; rua=mailto:dmarc@company.com"
+
+Testing:
+# Test MX record
+dig company.com MX
+
+# Test reverse DNS
+dig -x 203.0.113.50
+
+# Test SPF
+dig company.com TXT
+
+Why this matters:
+- Without proper DNS: Emails marked as spam
+- With proper DNS: Emails delivered successfully
+- PTR record: Required by most mail servers
+- SPF/DKIM/DMARC: Prevents email spoofing
+
+### Use Case 5: Development Environment with DNS
+
+Scenario: Developers need local development environment
+
+Setup:
+1. Install BIND on development machine
+2. Configure local domain: dev.local
+3. Create zone file:
+
+$TTL 86400
+@ IN SOA dns.dev.local. admin.dev.local. (
+        2025112401
+        3600
+        1800
+        604800
+        86400 )
+
+@       IN NS       dns.dev.local.
+
+; Local services
+dns             IN A        127.0.0.1
+localhost       IN A        127.0.0.1
+
+; Development servers
+api.dev         IN A        192.168.56.10
+web.dev         IN A        192.168.56.11
+db.dev          IN A        192.168.56.12
+cache.dev       IN A        192.168.56.13
+
+; Microservices
+auth.api.dev    IN A        192.168.56.20
+user.api.dev    IN A        192.168.56.21
+order.api.dev   IN A        192.168.56.22
+
+4. Configure system to use local DNS:
+echo "nameserver 127.0.0.1" > /etc/resolv.conf
+
+Benefits:
+- Mimics production environment
+- No need to edit /etc/hosts repeatedly
+- Easy to add new services
+- Team members share same configuration
+
+Developer workflow:
+# Start API server
+docker run -p 8080:8080 api-service
+
+# Access via DNS
+curl http://api.dev.local:8080/health
+
+# No need to remember 192.168.56.10!
+
+### Use Case 6: DNS for Kubernetes/Docker Environment
+
+Scenario: Microservices running in Kubernetes/Docker
+
+Challenge: Services need to discover each other
+
+Solution: Internal DNS for service discovery
+
+Kubernetes example (automatic):
+service-name.namespace.svc.cluster.local
+
+Custom DNS for Docker Compose:
+version: '3'
+services:
+  web:
+    image: nginx
+    networks:
+      - mynetwork
+  api:
+    image: api-service
+    networks:
+      - mynetwork
+networks:
+  mynetwork:
+    driver: bridge
+
+Docker automatically creates DNS:
+- web accessible at: web
+- api accessible at: api
+
+Manual setup with BIND:
+Zone file for cluster.local:
+
+web-service     IN A        172.20.0.10
+api-service     IN A        172.20.0.11
+db-service      IN A        172.20.0.12
+cache-service   IN A        172.20.0.13
+
+; Service discovery
+_api._tcp       IN SRV 0 5 8080 api-service.cluster.local.
+_web._tcp       IN SRV 0 5 80 web-service.cluster.local.
+
+### Use Case 7: Disaster Recovery with DNS
+
+Scenario: Primary data center fails, need to failover to backup
+
+Setup:
+Primary site: 203.0.113.0/24 (New York)
+Backup site: 198.51.100.0/24 (London)
+
+Normal operation (zone file):
+www     IN A        203.0.113.10    ; Primary site
+api     IN A        203.0.113.20    ; Primary site
+db      IN A        203.0.113.30    ; Primary site (internal only)
+
+During disaster:
+1. Update zone file:
+www     IN A        198.51.100.10   ; Backup site
+api     IN A        198.51.100.20   ; Backup site
+db      IN A        198.51.100.30   ; Backup site
+
+2. Increase serial number:
+Old: 2025112401
+New: 2025112402
+
+3. Reload zone:
+rndc reload example.com
+
+4. Wait for TTL to expire (clients get new IPs)
+
+Best practice for DR:
+- Low TTL (300 seconds = 5 minutes)
+- Allows faster failover
+- Trade-off: More DNS queries
+
+Low TTL configuration:
+$TTL 300    ; 5 minutes instead of 86400 (1 day)
+
+### Use Case 8: Blocking Unwanted Sites (DNS Filtering)
+
+Scenario: Block ads, malware, inappropriate content
+
+Solution: Configure DNS to return 0.0.0.0 for blocked domains
+
+Create blocklist zone:
+zone "ads.example.com" {
+    type master;
+    file "/var/named/blocked.zone";
+};
+
+zone "malware-site.com" {
+    type master;
+    file "/var/named/blocked.zone";
+};
+
+Blocked zone file (/var/named/blocked.zone):
+$TTL 86400
+@ IN SOA localhost. root.localhost. (
+        2025112401
+        3600
+        1800
+        604800
+        86400 )
+
+@       IN NS       localhost.
+@       IN A        0.0.0.0
+*       IN A        0.0.0.0
+
+Result:
+- Requests to ads.example.com return 0.0.0.0
+- Browser can't connect
+- Effectively blocks the site
+
+Popular DNS filtering:
+- Pi-hole (open-source)
+- OpenDNS Family Shield
+- Cloudflare 1.1.1.3 (malware blocking)
+
+### Use Case 9: Geographic Load Balancing
+
+Scenario: Serve users from nearest data center
+
+Setup:
+- US users → US server
+- EU users → EU server
+- Asia users → Asia server
+
+DNS configuration:
+www     IN A        203.0.113.10    ; US server
+www     IN A        198.51.100.10   ; EU server
+www     IN A        192.0.2.10      ; Asia server
+
+Advanced (GeoIP-based):
+Use BIND views:
+
+view "us-users" {
+    match-clients { US; };
+    zone "example.com" {
+        file "/var/named/example.com.us";
+    };
+};
+
+view "eu-users" {
+    match-clients { EU; };
+    zone "example.com" {
+        file "/var/named/example.com.eu";
+    };
+};
+
+view "asia-users" {
+    match-clients { AS; };
+    zone "example.com" {
+        file "/var/named/example.com.asia";
+    };
+};
+
+Each zone file points to regional server
+
+### Use Case 10: Testing and Staging Environments
+
+Scenario: Separate DNS for production, staging, and testing
+
+Setup:
+Production: example.com
+Staging: staging.example.com
+Testing: test.example.com
+
+Zone file:
+; Production
+www             IN A        203.0.113.10
+api             IN A        203.0.113.20
+
+; Staging
+www.staging     IN A        192.168.1.10
+api.staging     IN A        192.168.1.20
+
+; Testing
+www.test        IN A        192.168.2.10
+api.test        IN A        192.168.2.20
+
+Developer workflow:
+# Test on local
+curl http://www.test.example.com
+
+# Test on staging
+curl http://www.staging.example.com
+
+# Deploy to production
+curl http://www.example.com
+
+Benefits:
+- Clear separation of environments
+- Easy to switch between environments
+- No code changes needed
+- Matches production DNS structure
+
+---
+
+## 8. Real-Life Examples & Scenarios
+
+### Scenario 1: "Website Not Loading!" - DNS Troubleshooting
+
+Problem: Users can't access company website
+
+Troubleshooting steps:
+
+Step 1: Check if DNS resolves
+dig company-website.com
+
+Result: No answer section
+Diagnosis: DNS not resolving
+
+Step 2: Check name servers
+dig company-website.com NS
+
+Result:
+company-website.com.  IN NS  ns1.company.com.
+company-website.com.  IN NS  ns2.company.com.
+
+Step 3: Query name servers directly
+dig @ns1.company.com company-website.com
+
+Result: SERVFAIL
+Diagnosis: Name server not responding
+
+Step 4: Check if name server is reachable
+ping ns1.company.com
+
+Result: Request timeout
+Diagnosis: Name server is down!
+
+Solution:
+- Server crash or network issue
+- Contact hosting provider
+- Meanwhile, use secondary NS (ns2.company.com)
+
+### Scenario 2: Slow DNS Resolution
+
+Problem: Website loads slowly (5-10 seconds delay)
+
+Investigation:
+
+Step 1: Time DNS query
+time dig company.com
+
+Result: real 8.234s
+Diagnosis: DNS query taking 8 seconds!
+
+Step 2: Check DNS server
+cat /etc/resolv.conf
+
+Result: nameserver 10.0.0.1 (old internal DNS)
+
+Step 3: Test different DNS server
+dig @8.8.8.8 company.com
+
+Result: Query time: 23 msec
+Diagnosis: Local DNS server is the problem
+
+Solution:
+1. Temporary fix - use public DNS:
+echo "nameserver 8.8.8.8" > /etc/resolv.conf
+
+2. Permanent fix - investigate/restart local DNS:
+systemctl restart named
+rndc flush
+
+### Scenario 3: Email Not Being Received
+
+Problem: Sending emails to customers, but they're not receiving them
+
+Diagnosis steps:
+
+Step 1: Check MX record
+dig company.com MX
+
+Result:
+company.com.  IN MX  10 mail.company.com.
+
+Step 2: Check mail server A record
+dig mail.company.com A
+
+Result:
+mail.company.com.  IN A  203.0.113.50
+
+Step 3: Check reverse DNS
+dig -x 203.0.113.50
+
+Result: No PTR record found
+Diagnosis: Missing reverse DNS!
+
+Step 4: Check SPF record
+dig company.com TXT
+
+Result: No SPF record
+
+Problem identified:
+1. No PTR record → marked as spam
+2. No SPF record → marked as spam
+
+Solution:
+1. Add PTR record (contact ISP or data center)
+2. Add SPF record to DNS:
+@  IN TXT  "v=spf1 mx ip4:203.0.113.50 -all"
+
+3. Reload zone:
+rndc reload company.com
+
+4. Test:
+dig company.com TXT
+nslookup -type=txt company.com
+
+### Scenario 4: After DNS Changes, Website Still Shows Old IP
+
+Problem: Changed website IP in DNS, but some users still see old site
+
+Explanation: DNS Caching
+
+What happened:
+1. Old record had TTL of 86400 (24 hours)
+2. Users' systems cached old IP
+3. Won't update until TTL expires
+
+Solution:
+
+Immediate (for your testing):
+# Flush local DNS cache
+# Linux:
+systemctl restart nscd
+systemctl restart NetworkManager
+
+# macOS:
+sudo dscacheutil -flushcache
+
+# Windows:
+ipconfig /flushdns
+
+# Flush browser cache
+Ctrl+Shift+Delete (clear cache)
+
+Prevention (for future changes):
+1. Lower TTL before making changes:
+Old: $TTL 86400    ; 1 day
+New: $TTL 300      ; 5 minutes
+
+2. Wait for old TTL to expire (24 hours)
+
+3. Make the change
+
+4. Verify:
+dig company.com
+
+5. After change is stable, increase TTL again
+
+### Scenario 5: DNS Server Hacked/Poisoned
+
+Problem: Users visiting company.com get redirected to malicious site
+
+Diagnosis:
+
+Step 1: Check DNS resolution
+dig company.com
+
+Result:
+company.com.  IN A  198.51.100.99  ; Wrong IP!
+
+Step 2: Check zone file
+cat /var/named/company.com.zone
+
+Result: File shows correct IP (203.0.113.10)
+
+Step 3: Check server itself
+dig @localhost company.com
+
+Result: Returns correct IP
+
+Step 4: Check external DNS
+dig @8.8.8.8 company.com
+
+Result: Returns wrong IP (198.51.100.99)
+
+Diagnosis: DNS cache poisoning or registrar compromise
+
+Solution:
+
+Immediate action:
+1. Check registrar account
+   - Login to domain registrar
+   - Verify nameserver settings
+   - Check for unauthorized changes
+
+2. Enable 2FA on registrar account
+
+3. Change registrar password
+
+4. Contact registrar support
+
+5. Check for malware on DNS server:
+   rkhunter --check
+   clamscan -r /var/named
+
+Prevention:
+1. Enable DNSSEC
+2. Use registrar lock
+3. Enable 2FA everywhere
+4. Regular security audits
+5. Monitor DNS changes
+
+DNSSEC setup:
+dnssec-keygen -a RSASHA256 -b 2048 -n ZONE company.com
+dnssec-signzone -o company.com company.com.zone
+
+### Scenario 6: Slave DNS Not Syncing
+
+Problem: Master DNS updated, but slave shows old records
+
+Diagnosis:
+
+Step 1: Check serial number on master
+dig @master-dns.com company.com SOA
+
+Result:
+company.com.  IN SOA  ns1.company.com. admin.company.com. (
+                       2025112402 ...  ; Serial
+
+Step 2: Check serial on slave
+dig @slave-dns.com company.com SOA
+
+Result:
+company.com.  IN SOA  ns1.company.com. admin.company.com. (
+                       2025112401 ...  ; Serial (old!)
+
+Problem: Slave didn't sync
+
+Step 3: Check slave logs
+journalctl -u named | grep company.com
+
+Result: transfer of 'company.com/IN' from master: failed
+
+Possible causes:
+1. Serial number not increased
+2. Allow-transfer not configured
+3. Network issue between master and slave
+
+Solution:
+
+On master (/etc/named.conf):
+zone "company.com" {
+    type master;
+    file "company.com.zone";
+    allow-transfer { 203.0.113.20; };  ; Slave IP
+};
+
+On slave (/etc/named.conf):
+zone "company.com" {
+    type slave;
+    file "slaves/company.com.zone";
+    masters { 203.0.113.10; };  ; Master IP
+};
+
+Force transfer on slave:
+rndc retransfer company.com
+
+Verify:
+dig @slave-dns.com company.com SOA
+
+### Scenario 7: High DNS Query Load
+
+Problem: DNS server CPU at 100%, slow responses
+
+Investigation:
+
+Step 1: Check query rate
+rndc status
+
+Result: 50,000+ queries/second
+
+Step 2: Enable query logging
+rndc querylog on
+
+Step 3: Check log
+tail -f /var/log/messages | grep named
+
+Result: Repeated queries for random domains
+Diagnosis: DNS amplification attack!
+
+Example malicious queries:
+query: xjkdls3kd.company.com
+query: pwoeid83k.company.com
+query: qmxnvb393.company.com
+
+Solution:
+
+1. Rate limit queries (/etc/named.conf):
+rate-limit {
+    responses-per-second 10;
+    window 5;
+};
+
+2. Restrict recursion:
+recursion no;  ; For authoritative-only server
+
+Or:
+allow-recursion { 10.0.0.0/8; 192.168.0.0/16; };  ; Only internal
+
+3. Implement firewall rules:
+# Limit queries from single IP
+iptables -A INPUT -p udp --dport 53 -m hashlimit \
+  --hashlimit-above 30/minute --hashlimit-mode srcip \
+  --hashlimit-name dns -j DROP
+
+4. Use DNS firewall (Response Policy Zones):
+zone "rpz.local" {
+    type master;
+    file "rpz.zone";
+};
+
+5. Monitor and block attacking IPs
+
+### Scenario 8: Split-Horizon DNS Configuration
+
+Problem: Need different DNS responses for internal vs external users
+
+Example:
+- External users: www.company.com → Public IP (203.0.113.10)
+- Internal users: www.company.com → Private IP (192.168.1.10)
+
+Solution: BIND Views
+
+Configuration:
+acl "internal" {
+    192.168.0.0/16;
+    10.0.0.0/8;
+};
+
+view "internal-view" {
+    match-clients { internal; };
+    
+    zone "company.com" {
+        type master;
+        file "/var/named/company.com.internal";
+    };
+};
+
+view "external-view" {
+    match-clients { any; };
+    
+    zone "company.com" {
+        type master;
+        file "/var/named/company.com.external";
+    };
+};
+
+Internal zone file (/var/named/company.com.internal):
+www     IN A        192.168.1.10
+mail    IN A        192.168.1.20
+ftp     IN A        192.168.1.30
+
+External zone file (/var/named/company.com.external):
+www     IN A        203.0.113.10
+mail    IN A        203.0.113.20
+ftp     IN A        203.0.113.30
+
+Testing:
+# From internal network
+dig www.company.com
+; Answer: 192.168.1.10
+
+# From external network
+dig www.company.com
+; Answer: 203.0.113.10
+
+Benefits:
+- Internal users get faster access (local network)
+- Security: internal servers not exposed
+- Reduced bandwidth costs
+
+---
+
+## 9. Troubleshooting
+
+### Common DNS Errors and Solutions
+
+#### Error 1: named: Permission denied
+
+Error message:
+named[1234]: zone example.com/IN: loading from master file forward.zone failed: permission denied
+
+Cause: Incorrect file permissions
+
+Solution:
+# Check current permissions
+ls -l /var/named/forward.zone
+
+# Fix ownership
+chown root:named /var/named/forward.zone
+
+# Fix permissions
+chmod 640 /var/named/forward.zone
+
+# Fix SELinux context
+restorecon -v /var/named/forward.zone
+
+# Restart service
+systemctl restart named
+
+#### Error 2: zone example.com/IN: has no NS records
+
+Error message:
+zone example.com/IN: has no NS records
+
+Cause: Missing NS record in zone file
+
+Solution:
+Add NS record to zone file:
+@       IN NS       ns1.example.com.
+
+Must have at least one NS record!
+
+#### Error 3: DNS resolution timeout
+
+Error:
+;; connection timed out; no servers could be reached
+
+Causes and solutions:
+
+1. Firewall blocking:
+# Allow DNS through firewall
+firewall-cmd --permanent --add-service=dns
+firewall-cmd --reload
+
+2. Service not running:
+systemctl start named
+
+3. Wrong port or IP:
+# Check listen-on in /etc/named.conf
+listen-on port 53 { 127.0.0.1; 192.168.1.29; };
+
+4. SELinux blocking:
+# Check for denials
+ausearch -m avc -ts recent | grep named
+
+# If found, create policy or set to permissive:
+setenforce 0  ; Temporary
+# Or:
+semanage permissive -a named_t
+
+#### Error 4: SERVFAIL response
+
+Error:
+dig example.com
+; status: SERVFAIL
+
+Causes:
+1. DNSSEC validation failure
+2. Broken delegation
+3. Missing glue records
+
+Solutions:
+
+1. Disable DNSSEC temporarily:
+In /etc/named.conf:
+dnssec-validation no;
+
+2. Check delegation:
+dig example.com NS +trace
+
+3. Check zone file syntax:
+named-checkzone example.com /var/named/example.com.zone
+
+#### Error 5: Serial number not increasing
+
+Error message:
+zone example.com/IN: serial number not advanced
+
+Cause: Zone file changed but serial not incremented
+
+Solution:
+Edit zone file, increase serial:
+Old: 2025112401
+New: 2025112402
+
+Then:
+rndc reload example.com
+
+#### Error 6: Reverse DNS not working
+
+Problem:
+dig -x 192.168.1.100
+; ANSWER: 0
+
+Causes:
+1. Reverse zone not configured
+2. PTR record missing
+3. Wrong reverse zone name
+
+Solution:
+
+1. Create reverse zone in /etc/named.conf:
+zone "1.168.192.in-addr.arpa" IN {
+    type master;
+    file "reverse.zone";
+};
+
+2. Create /var/named/reverse.zone:
+$TTL 86400
+@ IN SOA ns1.example.com. admin.example.com. (
+        2025112401
+        3600
+        1800
+        604800
+        86400 )
+
+@       IN NS       ns1.example.com.
+100     IN PTR      www.example.com.
+
+3. Reload:
+systemctl restart named
+
+#### Error 7: Too many open files
+
+Error:
+named[1234]: socket: file descriptor exceeds limit (1024)
+
+Cause: High query volume exceeds file descriptor limit
+
+Solution:
+
+1. Increase limits:
+# Edit /etc/security/limits.conf
+named soft nofile 65536
+named hard nofile 65536
+
+2. For systemd service:
+# Edit /usr/lib/systemd/system/named.service
+[Service]
+LimitNOFILE=65536
+
+3. Reload:
+systemctl daemon-reload
+systemctl restart named
+
+#### Error 8: Zone transfer failed
+
+Error:
+transfer of 'example.com/IN' from master: failed
+
+Causes:
+1. allow-transfer not configured
+2. Network unreachable
+3. Firewall blocking
+
+Solutions:
+
+1. Configure master:
+zone "example.com" {
+    type master;
+    file "example.com.zone";
+    allow-transfer { 192.168.1.20; };  ; Slave IP
+    also-notify { 192.168.1.20; };
+};
+
+2. Test connectivity:
+ping slave-dns-ip
+telnet slave-dns-ip 53
+
+3. Allow firewall:
+firewall-cmd --permanent --add-port=53/tcp
+firewall-cmd --reload
+
+### DNS Debugging Commands Cheat Sheet
+
+Test forward lookup:
+dig example.com
+nslookup example.com
+host example.com
+
+Test reverse lookup:
+dig -x 192.168.1.100
+nslookup 192.168.1.100
+host 192.168.1.100
+
+Test specific record type:
+dig example.com MX
+dig example.com NS
+dig example.com SOA
+dig example.com ANY
+
+Query specific DNS server:
+dig @8.8.8.8 example.com
+nslookup example.com 8.8.8.8
+
+Trace DNS path:
+dig +trace example.com
+
+Check zone file syntax:
+named-checkconf /etc/named.conf
+named-checkzone example.com /var/named/example.com.zone
+
+View DNS cache:
+rndc dumpdb -cache
+cat /var/named/data/cache_dump.db
+
+Monitor queries:
+rndc querylog on
+tail -f /var/log/messages | grep named
+
+Check service status:
+systemctl status named
+rndc status
+
+Test zone transfer:
+dig @master-ip example.com AXFR
+
+---
+
+## 10. Best Practices
+
+### 1. Always Use Multiple Name Servers
+Minimum: 2 (primary + secondary)
+Recommended: 3+ for high availability
+
+Configuration:
+@       IN NS       ns1.example.com.
+@       IN NS       ns2.example.com.
+@       IN NS       ns3.example.com.
+
+### 2. Implement Proper TTL Strategy
+
+For stable records (rarely change):
+$TTL 86400    ; 1 day
+
+Before making changes:
+$TTL 300      ; 5 minutes
+
+After changes stabilize:
+$TTL 86400    ; Back to 1 day
+
+### 3. Always Increment Serial Numbers
+
+Use format: YYYYMMDDNN
+Example: 2025112401
+- 2025 = Year
+- 11 = Month
+- 24 = Day
+- 01 = Revision number
+
+If you make multiple changes in one day:
+2025112401
+2025112402
+2025112403
+
+### 4. Regular Backups
+
+Backup strategy:
+# Daily backup script
+#!/bin/bash
+DATE=$(date +%Y%m%d)
+BACKUP_DIR="/backup/dns"
+
+# Backup zone files
+tar -czf $BACKUP_DIR/zones-$DATE.tar.gz /var/named/
+
+# Backup configuration
+cp /etc/named.conf $BACKUP_DIR/named.conf-$DATE
+
+# Keep last 30 days
+find $BACKUP_DIR -name "zones-*.tar.gz" -mtime +30 -delete
+
+### 5. Monitor DNS Health
+
+Monitoring checks:
+1. Service running
+2. Query response time
+3. Zone transfer success (slave servers)
+4. Error rate
+5. Query per second (QPS)
+
+Monitoring script:
+#!/bin/bash
+# Quick DNS health check
+
+# Check if service is running
+systemctl is-active --quiet named || echo "ERROR: named not running"
+
+# Check query response time
+RESPONSE_TIME=$(dig @localhost example.com | grep "Query time" | awk '{print $4}')
+if [ $RESPONSE_TIME -gt 100 ]; then
+    echo "WARNING: Slow response time: $RESPONSE_TIME ms"
+fi
+
+# Check specific records
+dig @localhost www.example.com | grep -q "ANSWER: 1" || echo "ERROR: www record not resolving"
+
+### 6. Security Hardening
+
+#### Disable Recursion (for authoritative servers)
+recursion no;
+
+#### Restrict Recursion (for caching servers)
+allow-recursion { 10.0.0.0/8; 192.168.0.0/16; };
+
+#### Restrict Zone Transfers
+allow-transfer { 192.168.1.20; 192.168.1.21; };  ; Only slaves
+
+#### Hide Version
+version "Not Available";
+
+#### Implement Rate Limiting
+rate-limit {
+    responses-per-second 10;
+    window 5;
+};
+
+#### Enable DNSSEC
+dnssec-enable yes;
+dnssec-validation yes;
+
+#### Access Control Lists
+acl "trusted" {
+    192.168.0.0/16;
+    10.0.0.0/8;
+};
+
+allow-query { trusted; };
+
+### 7. Regular Testing
+
+Weekly tests:
+# Test all critical records
+dig www.example.com
+dig mail.example.com
+dig example.com MX
+dig example.com NS
+
+# Test from external DNS
+dig @8.8.8.8 example.com
+
+# Test reverse DNS
+dig -x <your-server-ip>
+
+# Check zone transfers
+dig @slave-server example.com SOA
+
+### 8. Documentation
+
+Document:
+1. IP addressing scheme
+2. Zone file organization
+3. Change log
+4. Emergency procedures
+5. Contact information
+
+Example documentation:
+# DNS Infrastructure Documentation
+
+## Servers
+- Master: 192.168.1.10 (dns1.example.com)
+- Slave 1: 192.168.1.20 (dns2.example.com)
+- Slave 2: 203.0.113.10 (dns3.example.com)
+
+## Domains Hosted
+- example.com (public)
+- internal.example.com (private)
+
+## Change Procedures
+1. Update zone file on master
+2. Increment serial number
+3. Test: named-checkzone
+4. Reload: rndc reload
+5. Verify: dig @localhost
+6. Monitor slave sync
+
+## Emergency Contacts
+- DNS Admin: admin@example.com
+- On-call: +1-555-0100
+
+### 9. Change Management
+
+Before making changes:
+1. Document what you're changing
+2. Create backup
+3. Lower TTL (if possible)
+4. Test in staging first
+
+Making changes:
+1. Edit zone file
+2. Increment serial
+3. Check syntax
+4. Reload zone
+5. Verify changes
+
+After changes:
+1. Monitor for issues
+2. Check logs
+3. Verify from multiple locations
+4. Update documentation
+
+### 10. Disaster Recovery Plan
+
+DR checklist:
+1. Regular backups (daily)
+2. Off-site backup copies
+3. Documented procedures
+4. Tested recovery process
+5. Secondary DNS (geographic diversity)
+6. Emergency contacts
+7. Monitoring and alerts
+
+Recovery procedure:
+# In case of master DNS failure:
+
+Step 1: Promote slave to master
+- Edit /etc/named.conf on slave
+- Change type from slave to master
+- Remove masters { }; line
+
+Step 2: Update zone files if needed
+
+Step 3: Update registrar
+- Point NS records to working servers
+
+Step 4: Rebuild failed master
+- Restore from backup
+- Verify configuration
+- Sync with new master
+
+---
+
+## 11. Important DNS Questions & Answers
+
+### Q1: What does BIND stand for?
+Answer: Berkeley Internet Name Domain. It's the most widely used DNS server software on Linux/Unix systems.
+
+### Q2: What is a DNS Server and its fundamentals?
+Answer: The Domain Name System (DNS) is a hierarchical, distributed database. It stores information for mapping Internet domain names to IP addresses and vice versa, email routing information, and other data used by Internet applications. Clients look up information in the DNS by calling a resolver library, which sends queries to one or more name servers and interprets the responses. The BIND 9 software distribution contains a name server, named, and a resolver library, libbind.
+
+### Q3: What is the default port of BIND?
+Answer: The BIND server is accessed via the network on port 53. Both TCP and UDP ports are used. Queries are made via UDP unless the response won't fit in a single UDP packet. If the response won't fit in a single UDP packet, then the response is returned via TCP.
+
+### Q4: How will you define Domain Name?
+Answer: The data stored in the DNS is identified by domain names that are organized as a tree according to organizational or administrative boundaries. Each node of the tree, called a domain, has a label. The domain name of the node is the concatenation of all the labels on the path from the node to the root node. For example, a domain name for a host at the company Linuxtechi, Inc. could be mail.linuxtechi.com, where "com" is the top-level domain, "linuxtechi" is the second-level domain belonging to the com domain, and "mail" is the hostname.
+
+### Q5: What are zone files in DNS server?
+Answer: The files which contain the data being served by the DNS system are called "Zone Files". They are made up of a Resource Records (RR). A zone file contains a $ORIGIN directive which is the starting point of the zone in the DNS hierarchy. It also contains a time-to-live (TTL) value that specifies how long resource records should be cached.
+
+### Q6: What are the different types of DNS Servers?
+Answer: The data stored in the DNS is identified by domain names that are organized as a tree. The delegation of authority for parts of the hierarchy is represented by different zone data files. Primary and secondary name servers serve zone data.
+
+- **Primary (Master):** The authoritative name server where the master copy of the zone data is maintained is called the primary master server, or simply the primary. Typically it loads the zone contents from some local file edited by humans or perhaps automatically generated by some software.
+
+- **Secondary (Slave):** The other authoritative servers, slaves, load the zone contents from another server using a replication process known as a zone transfer. Typically the data are transferred directly from the primary, but it is also possible to transfer it from another slave.
+
+### Q7: How the load balancing is achieved using DNS?
+Answer: A primitive form of load balancing can be achieved in the DNS by using multiple records (such as multiple A records) for one name. For example, if you have three WWW servers with network addresses of 10.0.0.1, 10.0.0.2, and 10.0.0.3, a set of records such as the following means that clients will randomly receive records in the order 1, 2, 3; 2, 3, 1; and 3, 1, 2. Most clients use the first record returned and discard the rest.
+
+When a resolver queries for these records, BIND will rotate them and respond to the query with the records in a different order. In the example above, clients will randomly receive records in the order 1, 2, 3; 2, 3, 1; and 3, 1, 2. Most clients use the first record returned and discard the rest.
+
+### Q8: How to check syntax of named.conf is correct or not?
+Answer: named-checkconf is the command which checks the syntax of named.conf file.
+
+Command:
+named-checkconf /etc/named.conf
+
+If bind is running in chroot environment use below command:
+named-checkconf -t /var/named/chroot /etc/named.conf
+
+### Q9: What are the different types of Resource Records in bind?
+Answer: Following is the list of resource records in bind:
+- **SOA** – start of authority, for a given zone
+- **NS** – name server
+- **A** – name-to-address mapping
+- **PTR** – address-to-name mapping
+- **CNAME** – canonical name (for aliases)
+- **MX** – mail exchanger (host to receive mail for this name)
+- **TXT** – textual info
+- **RP** – contact person for this zone
+- **WKS** – well-known services
+- **HINFO** – host information
+- **SRV** – service locator
+
+### Q10: Explain Bind chroot environment?
+Answer: Running bind in a chroot environment means named process will be limited to their directory only (/var/named/chroot). This can help improve system security by placing bind in a "sandbox", which will limit the damage done if a server is compromised.
+
+### Q11: What is domain delegation in Bind?
+Answer: Domain delegation means fully delegate the responsibility for a sub-domain to another name server.
+
+Example:
+squid.linuxtechi.com   IN NS   ns2.linuxtechi.com
+ns2.linuxtechi.com     IN A    192.168.1.51
+
+---
+
+## 12. Quick Reference Cheat Sheet
+
+### DNS Files Location
+/etc/named.conf                     # Main configuration
+/var/named/                         # Zone files directory
+/var/named/forward.zone             # Forward zone
+/var/named/reverse.zone             # Reverse zone
+/etc/resolv.conf                    # Client DNS configuration
+
+### Service Management
+systemctl start named               # Start service
+systemctl stop named                # Stop service
+systemctl restart named             # Restart service
+systemctl reload named              # Reload configuration
+systemctl enable named              # Enable at boot
+systemctl status named              # Check status
+
+### rndc Commands
+rndc status                         # Service status
+rndc reload                         # Reload all zones
+rndc reload example.com             # Reload specific zone
+rndc reconfig                       # Reload config only
+rndc flush                          # Flush cache
+rndc querylog on                    # Enable query logging
+rndc stop                           # Stop service
+
+### Testing Commands
+dig example.com                     # Basic query
+dig example.com MX                  # Mail servers
+dig example.com NS                  # Name servers
+dig example.com SOA                 # Start of Authority
+dig @8.8.8.8 example.com           # Query specific DNS
+dig +trace example.com              # Trace DNS path
+dig -x 192.168.1.100               # Reverse lookup
+
+nslookup example.com                # Basic query
+nslookup -type=MX example.com       # Mail servers
+
+host example.com                    # Basic query
+host -t MX example.com              # Mail servers
+
+### Syntax Check
+named-checkconf /etc/named.conf                             # Check config syntax
+named-checkzone example.com /var/named/example.com.zone    # Check zone syntax
+
+### Common Record Formats
+# A Record
+hostname        IN A        192.168.1.100
+
+# PTR Record
+100             IN PTR      hostname.example.com.
+
+# CNAME Record
+alias           IN CNAME    realname.example.com.
+
+# MX Record
+@               IN MX 10    mail.example.com.
+
+# NS Record
+@               IN NS       ns1.example.com.
+
+# TXT Record
+@               IN TXT      "v=spf1 mx -all"
+
+### Troubleshooting Quick Checks
+1. Service running: systemctl status named
+2. Syntax correct: named-checkconf
+3. Zone valid: named-checkzone example.com /var/named/example.com.zone
+4. DNS resolving: dig @localhost example.com
+5. Port listening: netstat -tulpn | grep :53
+6. Check logs: journalctl -u named -f
+
+---
+
+## Author Information
+Created by: Imran Afzal
+Website: www.utclisolutions.com
+
+For more Linux tutorials and DevOps guides, visit the website!
