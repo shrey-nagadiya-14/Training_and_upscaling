@@ -1,0 +1,1324 @@
+# Hostname/IP Lookup Commands - Complete Guide
+
+## Table of Contents
+1. [Introduction to DNS Lookup](#introduction-to-dns-lookup)
+2. [nslookup Command](#nslookup-command)
+3. [dig Command](#dig-command)
+4. [host Command](#host-command)
+5. [Daily Use Cases](#daily-use-cases)
+6. [Real-Life Examples](#real-life-examples)
+7. [Troubleshooting Scenarios](#troubleshooting-scenarios)
+
+---
+
+## 1. Introduction to DNS Lookup
+
+### What is DNS?
+- **DNS** = Domain Name System
+- The "phonebook of the internet"
+- Translates human-readable domain names (google.com) to IP addresses (142.250.185.46)
+- Without DNS, you'd have to remember IP addresses for every website
+
+### How DNS Works (Simplified)
+
+Step 1: You type "www.google.com" in browser
+Step 2: Your computer checks local DNS cache
+Step 3: If not found, queries DNS server (usually your ISP's)
+Step 4: DNS server returns IP address (e.g., 142.250.185.46)
+Step 5: Your browser connects to that IP address
+
+### DNS Record Types
+
+| Record Type | Purpose | Example |
+|-------------|---------|---------|
+| A | Maps domain to IPv4 address | example.com → 93.184.216.34 |
+| AAAA | Maps domain to IPv6 address | example.com → 2606:2800:220:1:248:1893:25c8:1946 |
+| CNAME | Alias of one domain to another | www.example.com → example.com |
+| MX | Mail server for domain | example.com → mail.example.com |
+| NS | Name servers for domain | example.com → ns1.example.com |
+| TXT | Text information (SPF, DKIM, etc.) | example.com → "v=spf1 include:_spf.google.com ~all" |
+| PTR | Reverse DNS (IP to domain) | 93.184.216.34 → example.com |
+| SOA | Start of Authority (zone info) | Primary name server, admin email, serial number |
+| SRV | Service location | _sip._tcp.example.com → sipserver.example.com:5060 |
+
+---
+
+## 2. nslookup Command
+
+### What is nslookup?
+- **nslookup** = Name Server Lookup
+- Available on Windows, Linux, and macOS
+- Used for querying DNS servers
+- Two modes: Interactive and Non-interactive
+- Older tool but still widely used
+
+### Basic Syntax
+nslookup [domain] [dns-server]
+
+### nslookup Modes
+
+#### Non-Interactive Mode (Quick Queries)
+nslookup google.com
+
+#### Interactive Mode (Multiple Queries)
+nslookup
+> google.com
+> facebook.com
+> exit
+
+### nslookup Examples
+
+#### Example 1: Basic Domain Lookup
+nslookup google.com
+
+Output:
+Server:  192.168.1.1
+Address: 192.168.1.1#53
+
+Non-authoritative answer:
+Name:    google.com
+Address: 142.250.185.46
+
+Explanation:
+- Server: Your DNS server (usually your router or ISP)
+- Address: DNS server IP with port 53 (DNS port)
+- Name: Domain you queried
+- Address: IP address of the domain
+
+#### Example 2: Reverse DNS Lookup (IP to Domain)
+nslookup 8.8.8.8
+
+Output:
+Server:  192.168.1.1
+Address: 192.168.1.1#53
+
+Non-authoritative answer:
+8.8.8.8.in-addr.arpa    name = dns.google
+
+Name:    dns.google
+Address: 8.8.8.8
+
+This tells you that 8.8.8.8 belongs to Google DNS
+
+#### Example 3: Query Specific DNS Server
+nslookup google.com 8.8.8.8
+
+This queries Google's DNS server (8.8.8.8) instead of your default DNS
+Useful for comparing results from different DNS servers
+
+#### Example 4: Query Specific Record Type
+# Query MX records (mail servers)
+nslookup -query=mx google.com
+
+Output:
+google.com      mail exchanger = 10 smtp.google.com
+
+# Query NS records (name servers)
+nslookup -query=ns google.com
+
+Output:
+google.com      nameserver = ns1.google.com
+google.com      nameserver = ns2.google.com
+google.com      nameserver = ns3.google.com
+google.com      nameserver = ns4.google.com
+
+# Query CNAME records
+nslookup -query=cname www.github.com
+
+Output:
+www.github.com  canonical name = github.com
+
+# Query TXT records (SPF, DKIM, verification)
+nslookup -query=txt google.com
+
+Output:
+google.com      text = "v=spf1 include:_spf.google.com ~all"
+
+#### Example 5: Interactive Mode with Multiple Queries
+nslookup
+> set type=A
+> google.com
+> set type=MX
+> google.com
+> exit
+
+This allows you to run multiple queries without retyping nslookup each time
+
+#### Example 6: Check DNS Propagation
+# Check from default DNS
+nslookup newdomain.com
+
+# Check from Google DNS
+nslookup newdomain.com 8.8.8.8
+
+# Check from Cloudflare DNS
+nslookup newdomain.com 1.1.1.1
+
+# Check from OpenDNS
+nslookup newdomain.com 208.67.222.222
+
+If results differ, DNS hasn't fully propagated yet
+
+#### Example 7: Debug Mode (Verbose Output)
+nslookup -debug google.com
+
+Shows detailed information about the DNS query process
+
+#### Example 8: Set Timeout
+nslookup -timeout=10 slow-dns-server.com
+
+Useful when querying slow or unreliable DNS servers
+
+### nslookup Common Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| -query=TYPE | Query specific record type | nslookup -query=mx domain.com |
+| -type=TYPE | Same as -query | nslookup -type=ns domain.com |
+| -debug | Enable debug mode | nslookup -debug domain.com |
+| -timeout=N | Set query timeout (seconds) | nslookup -timeout=5 domain.com |
+| -port=N | Use specific port | nslookup -port=5353 domain.com |
+
+### nslookup Record Types You Can Query
+- A (IPv4 address)
+- AAAA (IPv6 address)
+- CNAME (Canonical name)
+- MX (Mail exchange)
+- NS (Name server)
+- PTR (Pointer/reverse)
+- SOA (Start of authority)
+- TXT (Text records)
+- ANY (All records)
+
+---
+
+## 3. dig Command
+
+### What is dig?
+- **dig** = Domain Information Groper
+- More powerful and flexible than nslookup
+- Primary tool for DNS professionals
+- Available on Linux and macOS (Windows requires installation)
+- Provides more detailed output
+- Better for scripting and automation
+
+### Basic Syntax
+dig [options] [domain] [record-type] [@dns-server]
+
+### dig Output Sections
+
+When you run dig, you get several sections:
+
+1. Header: Query information
+2. QUESTION SECTION: What you asked
+3. ANSWER SECTION: The answer to your query
+4. AUTHORITY SECTION: Authoritative name servers
+5. ADDITIONAL SECTION: Additional information
+6. Statistics: Query time, server, timestamp
+
+### dig Examples
+
+#### Example 1: Basic Domain Lookup
+dig google.com
+
+Output:
+; <<>> DiG 9.18.1 <<>> google.com
+;; global options: +cmd
+;; Got answer:
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 12345
+;; flags: qr rd ra; QUERY: 1, ANSWER: 1, AUTHORITY: 0, ADDITIONAL: 1
+
+;; OPT PSEUDOSECTION:
+; EDNS: version: 0, flags:; udp: 512
+;; QUESTION SECTION:
+;google.com.                    IN      A
+
+;; ANSWER SECTION:
+google.com.             300     IN      A       142.250.185.46
+
+;; Query time: 23 msec
+;; SERVER: 192.168.1.1#53(192.168.1.1)
+;; WHEN: Mon Nov 24 10:30:00 UTC 2025
+;; MSG SIZE  rcvd: 55
+
+Key information:
+- ANSWER SECTION: google.com resolves to 142.250.185.46
+- 300: TTL (Time To Live) - cache this for 300 seconds
+- Query time: 23 milliseconds
+- SERVER: Which DNS server answered
+
+#### Example 2: Short Answer (Clean Output)
+dig google.com +short
+
+Output:
+142.250.185.46
+
+Perfect for scripts where you only need the IP address
+
+#### Example 3: Query Specific DNS Server
+dig @8.8.8.8 google.com
+
+This queries Google's DNS server (8.8.8.8)
+
+dig @1.1.1.1 google.com
+This queries Cloudflare's DNS server
+
+#### Example 4: Query Specific Record Types
+
+# A record (IPv4)
+dig google.com A
+
+# AAAA record (IPv6)
+dig google.com AAAA
+Output: 2607:f8b0:4004:c07::71
+
+# MX record (Mail servers)
+dig google.com MX
+Output:
+google.com.             3600    IN      MX      10 smtp.google.com.
+
+# NS record (Name servers)
+dig google.com NS
+Output:
+google.com.             21600   IN      NS      ns1.google.com.
+google.com.             21600   IN      NS      ns2.google.com.
+google.com.             21600   IN      NS      ns3.google.com.
+google.com.             21600   IN      NS      ns4.google.com.
+
+# CNAME record (Aliases)
+dig www.github.com CNAME
+Output:
+www.github.com.         3600    IN      CNAME   github.com.
+
+# TXT record (SPF, DKIM, verification)
+dig google.com TXT
+Output:
+google.com.             3600    IN      TXT     "v=spf1 include:_spf.google.com ~all"
+
+# SOA record (Start of Authority)
+dig google.com SOA
+Output shows: Primary name server, admin email, serial number, refresh, retry, expire, minimum TTL
+
+# ANY record (All available records)
+dig google.com ANY
+
+#### Example 5: Reverse DNS Lookup
+dig -x 8.8.8.8
+
+Output:
+8.8.8.8.in-addr.arpa.   86400   IN      PTR     dns.google.
+
+Or with short output:
+dig -x 8.8.8.8 +short
+Output: dns.google.
+
+#### Example 6: Trace DNS Resolution Path
+dig google.com +trace
+
+This shows the complete path from root servers to final answer:
+1. Queries root servers (.)
+2. Queries .com TLD servers
+3. Queries google.com authoritative servers
+4. Returns final answer
+
+Output (simplified):
+.                       518400  IN      NS      a.root-servers.net.
+com.                    172800  IN      NS      a.gtld-servers.net.
+google.com.             21600   IN      NS      ns1.google.com.
+google.com.             300     IN      A       142.250.185.46
+
+#### Example 7: Query Multiple Domains
+dig google.com facebook.com amazon.com +short
+
+Output:
+142.250.185.46
+157.240.241.35
+54.239.28.85
+
+#### Example 8: Show Only Answer Section
+dig google.com +noall +answer
+
+Output:
+google.com.             300     IN      A       142.250.185.46
+
+#### Example 9: Batch DNS Queries from File
+# Create file with domains
+echo -e "google.com\nfacebook.com\namazon.com" > domains.txt
+
+# Query all domains
+dig -f domains.txt +short
+
+#### Example 10: Check DNS Propagation
+dig @8.8.8.8 newdomain.com +short        # Google DNS
+dig @1.1.1.1 newdomain.com +short        # Cloudflare DNS
+dig @208.67.222.222 newdomain.com +short # OpenDNS
+dig newdomain.com +short                 # Your default DNS
+
+If all return same IP, DNS is fully propagated
+
+#### Example 11: Measure Query Time
+dig google.com | grep "Query time"
+
+Output:
+;; Query time: 23 msec
+
+Or for multiple queries:
+for i in {1..10}; do dig google.com | grep "Query time"; done
+
+#### Example 12: Check DNSSEC Validation
+dig google.com +dnssec
+
+Shows if domain uses DNSSEC (DNS Security Extensions)
+
+#### Example 13: Display TTL Values
+dig google.com +noall +answer
+
+Output:
+google.com.             285     IN      A       142.250.185.46
+
+The 285 is the TTL (Time To Live) - how long to cache this result
+
+### dig Common Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| +short | Short output (answer only) | dig google.com +short |
+| +trace | Trace delegation path | dig google.com +trace |
+| +noall +answer | Show only answer section | dig google.com +noall +answer |
+| +stats | Show statistics only | dig google.com +stats |
+| +nostats | Hide statistics | dig google.com +nostats |
+| -x | Reverse lookup | dig -x 8.8.8.8 |
+| @server | Query specific DNS server | dig @8.8.8.8 google.com |
+| -f file | Read queries from file | dig -f domains.txt |
+| -p port | Use specific port | dig -p 5353 google.com |
+| -4 | Use IPv4 only | dig -4 google.com |
+| -6 | Use IPv6 only | dig -6 google.com |
+
+### dig vs nslookup Comparison
+
+| Feature | dig | nslookup |
+|---------|-----|----------|
+| Output Detail | More detailed | Less detailed |
+| Scripting | Excellent | Good |
+| Ease of Use | Learning curve | Simple |
+| Flexibility | Very flexible | Limited |
+| Availability | Linux/macOS default | All platforms |
+| Professional Use | Preferred | Legacy |
+| Output Format | Structured | Basic |
+
+---
+
+## 4. host Command
+
+### What is host?
+- Simpler alternative to dig and nslookup
+- Quick and straightforward output
+- Great for simple lookups
+- Available on Linux and macOS
+
+### host Examples
+
+#### Example 1: Basic Lookup
+host google.com
+
+Output:
+google.com has address 142.250.185.46
+google.com has IPv6 address 2607:f8b0:4004:c07::71
+google.com mail is handled by 10 smtp.google.com.
+
+#### Example 2: Reverse Lookup
+host 8.8.8.8
+
+Output:
+8.8.8.8.in-addr.arpa domain name pointer dns.google.
+
+#### Example 3: Query Specific DNS Server
+host google.com 8.8.8.8
+
+#### Example 4: Verbose Output
+host -v google.com
+
+Shows detailed information similar to dig
+
+---
+
+## 5. Daily Use Cases
+
+### Use Case 1: Verify Website Is Accessible
+
+Problem: User reports "Can't access company website"
+
+Step 1: Check DNS resolution
+nslookup company-website.com
+
+If no answer returned:
+- DNS server issue
+- Domain expired
+- DNS not configured
+
+If answer returned:
+- Note the IP address
+- Proceed to next troubleshooting step (ping, curl)
+
+Real-Life Example:
+User: "I can't access portal.company.com"
+You: nslookup portal.company.com
+Output: NXDOMAIN (domain doesn't exist)
+Solution: DNS record not created or typo in domain name
+
+### Use Case 2: Troubleshoot Email Delivery Issues
+
+Problem: Emails from your domain are being rejected
+
+Step 1: Check MX records
+dig company.com MX
+
+Expected output:
+company.com.    3600    IN      MX      10 mail.company.com.
+company.com.    3600    IN      MX      20 mail2.company.com.
+
+Step 2: Check SPF record (anti-spam)
+dig company.com TXT | grep spf
+
+Expected:
+"v=spf1 include:_spf.google.com ~all"
+
+Step 3: Check DKIM record
+dig default._domainkey.company.com TXT
+
+Step 4: Check DMARC policy
+dig _dmarc.company.com TXT
+
+Real-Life Example:
+Problem: Emails to Gmail are bouncing
+Investigation:
+dig company.com MX +short
+Output: No MX records found
+Solution: Add MX records in DNS configuration
+
+### Use Case 3: Verify DNS Propagation After Changes
+
+Scenario: Just updated DNS records, need to verify propagation
+
+# Check your local DNS
+dig newdomain.com +short
+
+# Check Google DNS
+dig @8.8.8.8 newdomain.com +short
+
+# Check Cloudflare DNS
+dig @1.1.1.1 newdomain.com +short
+
+# Check OpenDNS
+dig @208.67.222.222 newdomain.com +short
+
+# Check from different geographic location (if you have access)
+ssh remote-server "dig newdomain.com +short"
+
+Real-Life Example:
+Scenario: Migrating website to new server
+1. Update A record: oldsite.com → 54.32.10.5 (new server)
+2. Check propagation every 15 minutes:
+   watch -n 900 'dig oldsite.com +short'
+3. Once all DNS servers return new IP, migration complete
+4. DNS TTL determines propagation speed (usually 24-48 hours max)
+
+### Use Case 4: Diagnose Slow Website Loading
+
+Problem: Website loading slowly for some users
+
+Step 1: Check DNS resolution time
+dig company-website.com | grep "Query time"
+
+If query time > 1000ms: DNS server is slow
+
+Step 2: Check from different DNS servers
+dig @8.8.8.8 company-website.com | grep "Query time"
+dig @1.1.1.1 company-website.com | grep "Query time"
+
+Step 3: Compare results
+- High query time on your DNS: Switch to faster DNS server
+- High query time everywhere: Issue with authoritative name servers
+
+Real-Life Example:
+User: "Website takes 10 seconds to load"
+Analysis:
+dig slowsite.com | grep "Query time"
+Output: Query time: 8543 msec
+Solution: DNS resolution taking 8.5 seconds! Switch to Google/Cloudflare DNS
+
+### Use Case 5: Verify CDN Configuration
+
+Scenario: Just configured CloudFront/Cloudflare CDN
+
+Step 1: Check CNAME record
+dig www.mysite.com +short
+
+Expected output:
+d111111abcdef8.cloudfront.net.
+13.224.146.52
+
+This confirms:
+1. www.mysite.com points to CloudFront
+2. CloudFront resolves to edge location IP
+
+Step 2: Check from different locations
+dig @8.8.8.8 www.mysite.com +short
+dig @1.1.1.1 www.mysite.com +short
+
+IPs may differ (different CDN edge locations)
+
+Real-Life Example:
+Setting up Cloudflare:
+1. Add CNAME: www → proxy-domain.cloudflare.net
+2. Verify: dig www.mysite.com
+3. Output shows Cloudflare IPs → CDN working
+
+### Use Case 6: Investigate Domain Hijacking/Spoofing
+
+Scenario: Suspicious email claiming to be from your company
+
+Step 1: Check sender's domain
+nslookup suspicious-company-domain.com
+
+Step 2: Compare with your real domain
+nslookup real-company-domain.com
+
+Step 3: Check MX records
+dig suspicious-company-domain.com MX
+dig real-company-domain.com MX
+
+Real-Life Example:
+Phishing email from: admin@companyname.co (fake)
+Your real domain: companyname.com
+Investigation:
+nslookup companyname.co → Different IP, different owner
+Action: Report phishing, warn users about fake domain
+
+### Use Case 7: Troubleshoot VPN/Internal DNS
+
+Problem: Can access external sites but not internal resources
+
+Step 1: Check external DNS resolution
+nslookup google.com
+Works? External DNS is fine
+
+Step 2: Check internal DNS resolution
+nslookup internal-server.company.local
+
+Fails? VPN DNS not configured properly
+
+Step 3: Check which DNS server you're using
+nslookup google.com
+Note the "Server:" line
+
+Real-Life Example:
+Working from home via VPN:
+- Can browse internet: ✓
+- Can't access internal.company.local: ✗
+Investigation:
+nslookup internal.company.local
+Output: Can't find internal.company.local
+Solution: VPN not pushing internal DNS server (10.0.0.10)
+Fix: Add DNS server in VPN settings
+
+### Use Case 8: Verify Load Balancer Configuration
+
+Scenario: Setup round-robin DNS for load balancing
+
+dig webapp.company.com +short
+
+Expected output (multiple IPs):
+192.168.1.10
+192.168.1.11
+192.168.1.12
+
+Test multiple times:
+for i in {1..10}; do dig webapp.company.com +short; sleep 1; done
+
+Should see different IP orders (round-robin)
+
+Real-Life Example:
+High-traffic website with 3 servers:
+1. Configure DNS with 3 A records
+2. Verify: dig webapp.com +short (shows all 3 IPs)
+3. Test: Reload page multiple times, see different server headers
+4. Load distributed across servers
+
+### Use Case 9: Check Subdomain Configuration
+
+Scenario: Setting up staging environment
+
+Step 1: Create subdomain
+staging.myapp.com → 192.168.1.50
+
+Step 2: Verify DNS record
+dig staging.myapp.com +short
+
+Expected:
+192.168.1.50
+
+Step 3: Check it's not a CNAME (if you want A record)
+dig staging.myapp.com +noall +answer
+
+Real-Life Example:
+Creating multiple environments:
+- dev.myapp.com → 192.168.1.30
+- staging.myapp.com → 192.168.1.40
+- prod.myapp.com → 54.32.10.20
+
+Verification:
+dig dev.myapp.com staging.myapp.com prod.myapp.com +short
+
+### Use Case 10: Verify Domain Transfer
+
+Scenario: Transferred domain to new registrar
+
+Step 1: Check name servers
+dig mydomain.com NS
+
+Expected output:
+mydomain.com.    86400   IN      NS      ns1.newregistrar.com.
+mydomain.com.    86400   IN      NS      ns2.newregistrar.com.
+
+Step 2: Verify all records intact
+dig mydomain.com A
+dig mydomain.com MX
+dig mydomain.com TXT
+
+Real-Life Example:
+Transferring from GoDaddy to Cloudflare:
+1. Transfer initiated
+2. Wait 24-48 hours
+3. Check: dig mydomain.com NS +short
+4. Output should show Cloudflare name servers
+5. Verify all existing records migrated correctly
+
+---
+
+## 6. Real-Life Troubleshooting Scenarios
+
+### Scenario 1: Complete Website Down Investigation
+
+User report: "Website is completely down!"
+
+Step 1: Check if domain resolves
+nslookup company-website.com
+
+Result: Success - Returns IP 54.32.10.20
+
+Step 2: Check if IP is reachable
+ping 54.32.10.20
+
+Result: Success - Host is up
+
+Step 3: Check if web server responds
+curl -I http://company-website.com
+
+Result: Connection timeout
+
+Diagnosis: DNS works, server is up, but web server (Apache/Nginx) is down
+
+Solution: SSH to server, restart web server:
+sudo systemctl restart nginx
+
+Lesson: DNS lookup helps isolate the problem layer
+
+### Scenario 2: Email Not Receiving
+
+Problem: Not receiving emails to new domain
+
+Investigation:
+# Check if MX records exist
+dig newdomain.com MX +short
+
+Result: No output (no MX records!)
+
+# Check what TXT records exist
+dig newdomain.com TXT
+
+Result: No SPF record
+
+Solution:
+1. Add MX records:
+   newdomain.com.  IN  MX  10  mail.newdomain.com.
+2. Add SPF record:
+   newdomain.com.  IN  TXT  "v=spf1 mx ~all"
+3. Wait for DNS propagation (check with dig every 15 min)
+4. Test: Send email to admin@newdomain.com
+
+### Scenario 3: Intermittent Website Access
+
+Problem: Some users can access site, others can't
+
+Investigation:
+# Check from default DNS
+dig problematic-site.com +short
+Output: 192.168.1.100 (old server)
+
+# Check from Google DNS
+dig @8.8.8.8 problematic-site.com +short
+Output: 54.32.10.20 (new server)
+
+Diagnosis: DNS propagation incomplete or caching issue
+
+Solutions:
+1. Wait for full propagation (up to 48 hours)
+2. Users can switch to 8.8.8.8 temporarily
+3. Flush local DNS cache:
+   Windows: ipconfig /flushdns
+   Linux: sudo systemd-resolve --flush-caches
+   Mac: sudo dscacheutil -flushcache
+
+### Scenario 4: SSL Certificate Not Working
+
+Problem: Browser shows "Certificate name mismatch"
+
+Investigation:
+# Check what domain certificate is issued for
+openssl s_client -connect website.com:443 -servername website.com | grep subject
+
+# Check DNS resolution
+nslookup website.com
+Output: www.website.com (CNAME)
+
+# Check certificate against www
+openssl s_client -connect www.website.com:443 -servername www.website.com | grep subject
+
+Diagnosis: Certificate issued for "www.website.com" but user accessing "website.com"
+
+Solutions:
+1. Get wildcard certificate (*.website.com)
+2. Add both names to certificate (SAN)
+3. Redirect website.com → www.website.com with DNS:
+   website.com.  IN  CNAME  www.website.com.
+
+### Scenario 5: Subdomain Not Working After Creation
+
+Problem: Created api.company.com but returns error
+
+Investigation:
+# Check if subdomain resolves
+nslookup api.company.com
+
+Result: NXDOMAIN (doesn't exist)
+
+# Check if main domain works
+nslookup company.com
+
+Result: Success
+
+# Check authoritative name servers
+dig company.com NS +short
+Output:
+ns1.dns-provider.com
+ns2.dns-provider.com
+
+# Check directly from authoritative server
+dig @ns1.dns-provider.com api.company.com +short
+
+Result: 192.168.1.100
+
+Diagnosis: DNS record exists on authoritative server but not propagated yet
+
+Solution: Wait 5-15 minutes for DNS cache to expire, then:
+dig api.company.com +short
+Output: 192.168.1.100 (now works!)
+
+### Scenario 6: Internal DNS Split-Horizon Issue
+
+Problem: External users can access app.company.com, internal users cannot
+
+Investigation from external network:
+nslookup app.company.com
+Output: 203.0.113.50 (public IP)
+
+Investigation from internal network:
+nslookup app.company.com
+Output: 10.0.1.50 (private IP)
+
+# Check which DNS server internal network uses
+nslookup google.com
+Output: Server: 10.0.0.10 (internal DNS)
+
+Diagnosis: Split-horizon DNS - internal DNS returning wrong IP
+
+Solution:
+1. Update internal DNS server (10.0.0.10)
+2. Change app.company.com A record from 10.0.1.50 to 10.0.1.100 (correct internal IP)
+3. Flush DNS on internal DNS server
+4. Test: nslookup app.company.com (should return correct internal IP)
+
+### Scenario 7: CDN Not Caching Content
+
+Problem: CDN enabled but not seeing performance improvement
+
+Investigation:
+# Check if domain points to CDN
+dig www.mysite.com +short
+Output: 
+d1234.cloudfront.net.
+52.84.12.34
+
+Good! Domain points to CloudFront
+
+# Check if origin domain resolves
+dig origin.mysite.com +short
+Output: No response
+
+Problem identified! Origin server DNS not configured
+
+# Check CloudFront origin setting
+# Origin should be: origin.mysite.com
+# But origin.mysite.com has no A record
+
+Solution:
+1. Add A record: origin.mysite.com → 54.32.10.20
+2. Verify: dig origin.mysite.com +short (returns 54.32.10.20)
+3. Wait 5 minutes for propagation
+4. Test CDN: curl -I www.mysite.com (should now work)
+
+### Scenario 8: Geo-DNS Not Working Correctly
+
+Problem: Users in Europe getting routed to US servers (slow)
+
+Investigation:
+# Check from US location
+dig @8.8.8.8 app.company.com +short
+Output: 54.32.10.20 (US server)
+
+# Check from EU location (via VPN or remote server)
+ssh eu-server "dig app.company.com +short"
+Output: 54.32.10.20 (Still US server!)
+
+Problem: Geo-DNS not configured properly
+
+# Check DNS provider geo-routing settings
+dig app.company.com +trace
+
+Solution:
+1. Configure geo-routing in DNS provider:
+   - US users → 54.32.10.20
+   - EU users → 52.49.15.30
+   - Asia users → 54.169.12.40
+2. Test from each region
+3. Verify latency improved for EU users
+
+---
+
+## 7. Advanced DNS Troubleshooting
+
+### Technique 1: Full DNS Resolution Trace
+
+# See complete path from root servers to answer
+dig google.com +trace
+
+Output shows:
+1. Root servers (.)
+2. TLD servers (.com)
+3. Authoritative servers (google.com)
+4. Final answer
+
+Use when: Troubleshooting delegation issues or DNSSEC problems
+
+### Technique 2: Compare Multiple DNS Servers
+
+# Create comparison script
+echo "Google DNS:"; dig @8.8.8.8 example.com +short
+echo "Cloudflare DNS:"; dig @1.1.1.1 example.com +short
+echo "OpenDNS:"; dig @208.67.222.222 example.com +short
+echo "Your ISP:"; dig example.com +short
+
+Use when: DNS propagation issues or finding fastest DNS server
+
+### Technique 3: Monitor DNS Changes
+
+# Watch DNS record changes in real-time
+watch -n 60 'dig newdomain.com +short'
+
+Updates every 60 seconds
+Use when: Monitoring DNS propagation after changes
+
+### Technique 4: Bulk DNS Queries
+
+# Check multiple domains at once
+for domain in google.com facebook.com amazon.com; do
+  echo "=== $domain ==="
+  dig $domain +short
+  echo
+done
+
+Use when: Checking multiple domains or subdomains
+
+### Technique 5: DNS Performance Testing
+
+# Test query speed
+time dig google.com +short
+
+Or measure multiple queries:
+for i in {1..10}; do
+  dig google.com | grep "Query time"
+done | awk '{sum+=$4} END {print "Average:",sum/NR,"ms"}'
+
+Use when: Comparing DNS server performance
+
+### Technique 6: Check All Record Types
+
+# Comprehensive DNS audit
+for type in A AAAA MX NS TXT SOA; do
+  echo "=== $type Records ==="
+  dig company.com $type +short
+  echo
+done
+
+Use when: Complete DNS configuration review
+
+### Technique 7: Detect DNS Hijacking
+
+# Check if DNS returns unexpected results
+dig google.com +short
+
+If returns strange IP (not Google's), DNS might be hijacked
+
+# Check multiple known sites
+for site in google.com facebook.com amazon.com; do
+  echo "$site:"
+  dig $site +short
+done
+
+If all return same IP or suspicious IPs: DNS hijacking
+
+Solution: Change DNS servers to 8.8.8.8 or 1.1.1.1
+
+---
+
+## 8. Best Practices
+
+### DNS Lookup Best Practices
+
+1. Always check multiple DNS servers when troubleshooting:
+dig @8.8.8.8 domain.com +short  # Google
+dig @1.1.1.1 domain.com +short  # Cloudflare
+dig domain.com +short            # Your DNS
+
+2. Use +short for scripting:
+IP=$(dig google.com +short | head -n1)
+
+3. Document DNS changes with timestamps:
+echo "$(date): Changed A record to 54.32.10.20" >> dns-changes.log
+dig domain.com +short >> dns-changes.log
+
+4. Set appropriate TTL values:
+- High-traffic, stable: 86400 (24 hours)
+- Before migration: 300 (5 minutes)
+- During testing: 60 (1 minute)
+- After migration stable: 3600 (1 hour)
+
+5. Always verify DNS changes before and after:
+# Before
+dig domain.com +short > before.txt
+
+# Make changes...
+
+# After
+dig domain.com +short > after.txt
+
+# Compare
+diff before.txt after.txt
+
+6. Use version control for DNS zone files:
+git add zones/example.com.zone
+git commit -m "Updated A record for www to new server"
+
+7. Monitor DNS query performance:
+# Daily check
+dig important-domain.com | grep "Query time" >> dns-performance.log
+
+8. Keep backup of DNS records:
+dig domain.com ANY > dns-backup-$(date +%Y%m%d).txt
+
+### Security Best Practices
+
+1. Use DNSSEC when possible:
+dig example.com +dnssec
+
+2. Verify SPF/DKIM/DMARC for email security:
+dig domain.com TXT | grep spf
+dig default._domainkey.domain.com TXT
+dig _dmarc.domain.com TXT
+
+3. Don't expose internal server names in DNS:
+# Bad: admin-server-01.company.com
+# Good: admin.company.com
+
+4. Regularly audit DNS records:
+# List all subdomains
+dig company.com AXFR  # Zone transfer (if allowed)
+
+5. Monitor for unauthorized DNS changes:
+# Daily check
+dig company.com NS +short > ns-check.txt
+diff ns-check.txt ns-baseline.txt || alert-admin
+
+---
+
+## 9. Quick Reference Cheat Sheet
+
+### nslookup Quick Commands
+# Basic lookup
+nslookup domain.com
+
+# Reverse lookup
+nslookup 8.8.8.8
+
+# Query specific DNS server
+nslookup domain.com 8.8.8.8
+
+# Query MX records
+nslookup -query=mx domain.com
+
+# Query NS records
+nslookup -query=ns domain.com
+
+# Query TXT records
+nslookup -query=txt domain.com
+
+# Interactive mode
+nslookup
+> set type=A
+> domain.com
+> exit
+
+### dig Quick Commands
+# Basic lookup
+dig domain.com
+
+# Short answer only
+dig domain.com +short
+
+# Query specific DNS server
+dig @8.8.8.8 domain.com
+
+# Query specific record type
+dig domain.com MX
+dig domain.com NS
+dig domain.com TXT
+
+# Reverse lookup
+dig -x 8.8.8.8
+
+# Trace delegation path
+dig domain.com +trace
+
+# Show only answer
+dig domain.com +noall +answer
+
+# Multiple domains
+dig domain1.com domain2.com +short
+
+# Query time measurement
+dig domain.com | grep "Query time"
+
+### host Quick Commands
+# Basic lookup
+host domain.com
+
+# Reverse lookup
+host 8.8.8.8
+
+# Query specific server
+host domain.com 8.8.8.8
+
+# Verbose output
+host -v domain.com
+
+---
+
+## 10. Common DNS Record Examples
+
+### Website Configuration
+# Main website
+example.com.           3600    IN    A      93.184.216.34
+
+# WWW subdomain
+www.example.com.       3600    IN    CNAME  example.com.
+
+# API subdomain
+api.example.com.       3600    IN    A      52.32.10.20
+
+# CDN Configuration
+cdn.example.com.       3600    IN    CNAME  d123.cloudfront.net.
+
+### Email Configuration
+# MX Records (Mail Servers)
+example.com.           3600    IN    MX     10 mail.example.com.
+example.com.           3600    IN    MX     20 mail2.example.com.
+
+# SPF Record (Sender Policy Framework)
+example.com.           3600    IN    TXT    "v=spf1 mx include:_spf.google.com ~all"
+
+# DKIM Record (DomainKeys Identified Mail)
+default._domainkey.example.com. 3600 IN TXT "v=DKIM1; k=rsa; p=MIGfMA0GCS..."
+
+# DMARC Record (Domain-based Message Authentication)
+_dmarc.example.com.    3600    IN    TXT    "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"
+
+### Service Configuration
+# FTP Server
+ftp.example.com.       3600    IN    A      93.184.216.35
+
+# Database (internal only)
+db.internal.example.com. 300   IN    A      10.0.1.50
+
+# VPN
+vpn.example.com.       3600    IN    A      93.184.216.36
+
+### Load Balancing (Round Robin DNS)
+webapp.example.com.    300     IN    A      192.168.1.10
+webapp.example.com.    300     IN    A      192.168.1.11
+webapp.example.com.    300     IN    A      192.168.1.12
+
+### Verification Records
+# Google Workspace Verification
+example.com.           3600    IN    TXT    "google-site-verification=abc123def456"
+
+# Domain Ownership
+example.com.           3600    IN    TXT    "verification-code-from-provider"
+
+---
+
+## 11. DNS Troubleshooting Flowchart
+
+Problem: Cannot access website
+
+Step 1: Can you resolve the domain name?
+  Command: nslookup website.com
+  
+  ├─ YES (returns IP) → Go to Step 2
+  └─ NO (NXDOMAIN or timeout) → DNS Issue
+      ├─ Try different DNS server: nslookup website.com 8.8.8.8
+      │   ├─ Works → Your DNS server problem
+      │   └─ Doesn't work → Domain doesn't exist or not configured
+      └─ Check if domain expired or DNS records missing
+
+Step 2: Can you reach the IP address?
+  Command: ping <IP_from_step1>
+  
+  ├─ YES (replies received) → Go to Step 3
+  └─ NO (timeout or unreachable) → Network/Firewall Issue
+      ├─ Check your internet connection
+      ├─ Check if IP is correct
+      └─ Server might be down
+
+Step 3: Can you access the service?
+  Command: curl -I http://website.com
+  
+  ├─ YES (HTTP 200 OK) → Website works!
+  └─ NO (timeout or error) → Service Issue
+      ├─ Web server down
+      ├─ Firewall blocking port 80/443
+      └─ Service not listening on port
+
+---
+
+## 12. Helpful DNS Resources
+
+### Public DNS Servers
+
+| Provider | Primary DNS | Secondary DNS | Features |
+|----------|-------------|---------------|----------|
+| Google | 8.8.8.8 | 8.8.4.4 | Fast, reliable |
+| Cloudflare | 1.1.1.1 | 1.0.0.1 | Privacy-focused, fast |
+| OpenDNS | 208.67.222.222 | 208.67.220.220 | Filtering options |
+| Quad9 | 9.9.9.9 | 149.112.112.112 | Malware blocking |
+| Cisco Umbrella | 208.67.222.222 | 208.67.220.220 | Security filtering |
+
+### DNS Propagation Check Tools (Online)
+- https://dnschecker.org
+- https://whatsmydns.net
+- https://dns propagation.net
+
+### TTL Reference
+
+| TTL Value | Time | When to Use |
+|-----------|------|-------------|
+| 60 | 1 minute | Testing, frequent changes |
+| 300 | 5 minutes | Before migration |
+| 3600 | 1 hour | Normal operations |
+| 86400 | 24 hours | Stable, high-traffic sites |
+
+---
+
+## 13. Conclusion
+
+### Key Takeaways
+
+1. **nslookup**: Simple, available everywhere, good for quick checks
+2. **dig**: Powerful, detailed, preferred by professionals
+3. **host**: Quick and simple, middle ground
+
+### When to Use What
+
+Use **nslookup** when:
+✅ Quick check needed
+✅ Working on Windows
+✅ Simple reverse lookup
+✅ Checking specific record types
+✅ Available on all platforms
+
+Use **dig** when:
+✅ Need detailed information
+✅ Troubleshooting complex issues
+✅ Writing scripts/automation
+✅ Tracing DNS delegation
+✅ Performance measurement
+✅ Professional DNS work
+
+Use **host** when:
+✅ Need simpler output than dig
+✅ Quick command-line lookup
+✅ Reverse DNS check
+✅ Available on Linux/macOS
+
+### Essential Commands to Remember
+
+# Quick lookup
+nslookup domain.com
+dig domain.com +short
+
+# Check specific record
+dig domain.com MX
+dig domain.com TXT
+
+# Reverse lookup
+nslookup 8.8.8.8
+dig -x 8.8.8.8
+
+# Query specific DNS server
+dig @8.8.8.8 domain.com
+
+# Trace DNS path
+dig domain.com +trace
+
+# Check propagation
+dig @8.8.8.8 domain.com +short
+dig @1.1.1.1 domain.com +short
+
+### Final Tips
+
+1. Always verify DNS changes using multiple DNS servers
+2. Document TTL values before making changes
+3. Test from different geographic locations when possible
+4. Keep backup of DNS zone files
+5. Monitor DNS query performance regularly
+6. Use DNSSEC when security is critical
+7. Implement proper email authentication (SPF, DKIM, DMARC)
+8. Regular DNS audits prevent security issues
+
+---
+
+## Author Information
+Created by: Imran Afzal
+Website: www.utclisolutions.com
+
+For more Linux tutorials and DevOps guides, visit the website!
