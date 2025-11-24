@@ -1,0 +1,2171 @@
+# Sendmail and Postfix - Complete Guide
+
+## Table of Contents
+1. [Introduction to Mail Transfer Agents (MTAs)](#introduction-to-mail-transfer-agents)
+2. [Sendmail](#sendmail)
+3. [Postfix](#postfix)
+4. [Sendmail vs Postfix Comparison](#sendmail-vs-postfix-comparison)
+5. [Daily Use Cases](#daily-use-cases)
+6. [Real-Life Examples](#real-life-examples)
+7. [Installation & Configuration](#installation-and-configuration)
+8. [Troubleshooting](#troubleshooting)
+9. [Best Practices](#best-practices)
+
+---
+
+## 1. Introduction to Mail Transfer Agents (MTAs)
+
+### What is an MTA?
+- **MTA** = Mail Transfer Agent
+- Software application that transfers electronic mail messages from one computer to another
+- Uses SMTP (Simple Mail Transfer Protocol)
+- Acts as a "post office" for your Linux server
+- Responsible for routing and delivering emails
+
+### How Email Works (Simplified)
+
+┌─────────────┐      SMTP       ┌─────────────┐      SMTP       ┌─────────────┐
+│   Sender    │ ───────────────> │  MTA Server │ ───────────────> │  Recipient  │
+│  (You)      │    Port 25       │  (Sendmail/ │    Port 25       │   Server    │
+│             │                  │   Postfix)  │                  │             │
+└─────────────┘                  └─────────────┘                  └─────────────┘
+      │                                 │                                 │
+      │                                 │                                 │
+   MUA (Mail                      Queue & Relay                      MDA (Mail
+   User Agent)                     Management                        Delivery Agent)
+   
+MUA = Mail User Agent (Outlook, Thunderbird, mail command)
+MTA = Mail Transfer Agent (Sendmail, Postfix)
+MDA = Mail Delivery Agent (Dovecot, Procmail)
+
+### Common MTAs in Linux
+1. **Sendmail** - Oldest, most powerful, complex configuration
+2. **Postfix** - Modern, secure, easy to configure (most popular)
+3. **Exim** - Flexible, used by cPanel
+4. **Qmail** - Security-focused
+5. **Postfix** - Performance-oriented
+
+### SMTP Protocol Basics
+- **SMTP** = Simple Mail Transfer Protocol
+- **Port 25** = Default SMTP port (unencrypted)
+- **Port 465** = SMTPS (SMTP over SSL/TLS) - deprecated
+- **Port 587** = Submission port (STARTTLS) - recommended
+- **Port 993** = IMAPS (for receiving email)
+- **Port 995** = POP3S (for receiving email)
+
+---
+
+## 2. Sendmail
+
+### What is Sendmail?
+
+Sendmail is a program in Linux operating systems that allows system administrators 
+to send email from the Linux system.
+
+- **Created**: 1979 (one of the oldest MTAs)
+- **Developer**: Eric Allman
+- **License**: Open Source (Sendmail License)
+- **Market Share**: ~10% (declining)
+- **Pros**: Extremely powerful, handles complex routing
+- **Cons**: Complex configuration, security concerns, steep learning curve
+
+### Key Features of Sendmail
+- Uses SMTP (Simple Mail Transfer Protocol)
+- Default SMTP port = 25
+- Attempts to deliver mail immediately
+- Queues messages for later delivery if recipient unavailable
+- Highly configurable (but complex)
+- Supports multiple delivery methods
+- Built-in spam filtering (limited)
+
+### Sendmail Architecture
+
+┌────────────────────────────────────────────────────────────┐
+│                         SENDMAIL                            │
+├────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌──────────┐    ┌──────────┐    ┌──────────┐            │
+│  │  Queue   │───>│  Router  │───>│ Delivery │            │
+│  │ Manager  │    │          │    │  Agent   │            │
+│  └──────────┘    └──────────┘    └──────────┘            │
+│       │               │                 │                  │
+│       v               v                 v                  │
+│  /var/spool/     Rules from      Local/Remote             │
+│    mqueue        sendmail.cf     Delivery                 │
+│                                                             │
+└────────────────────────────────────────────────────────────┘
+
+### Sendmail Files and Directories
+
+File/Directory                    Purpose
+─────────────────────────────────────────────────────────────
+/etc/mail/sendmail.mc             Main configuration (macro source)
+/etc/mail/sendmail.cf             Compiled configuration (complex)
+/etc/mail/access                  Access control (allow/deny hosts)
+/etc/mail/local-host-names        Local domain names
+/etc/mail/aliases                 Email aliases
+/etc/mail/virtusertable           Virtual user mappings
+/etc/mail/mailertable             Custom mail routing
+/var/spool/mqueue                 Mail queue directory
+/var/log/maillog                  Mail server logs
+/usr/sbin/sendmail                Sendmail binary
+
+### Sendmail Service Management
+
+Check if sendmail is installed:
+rpm -qa | grep sendmail
+dpkg -l | grep sendmail
+
+Check sendmail status:
+systemctl status sendmail
+
+Start sendmail:
+systemctl start sendmail
+
+Stop sendmail:
+systemctl stop sendmail
+
+Restart sendmail:
+systemctl restart sendmail
+
+Enable sendmail on boot:
+systemctl enable sendmail
+
+Disable sendmail on boot:
+systemctl disable sendmail
+
+### Sendmail Installation & Configuration (RHEL/CentOS)
+
+Step 1: Login as root
+su -
+
+Step 2: Check if already installed
+rpm -qa | grep sendmail
+
+Step 3: Install sendmail
+yum install sendmail sendmail-cf
+
+Step 4: Edit main configuration
+vi /etc/mail/sendmail.mc
+
+Step 5: Compile configuration
+m4 /etc/mail/sendmail.mc > /etc/mail/sendmail.cf
+
+Step 6: Start sendmail service
+systemctl start sendmail
+systemctl enable sendmail
+
+Step 7: Stop firewall (for testing)
+systemctl stop firewalld
+systemctl disable firewalld
+
+Step 8: Configure SELinux (if enabled)
+setenforce 0
+
+### Sendmail Basic Configuration
+
+Edit /etc/mail/sendmail.mc:
+vi /etc/mail/sendmail.mc
+
+Key configuration changes:
+
+1. Allow external connections (comment out this line):
+dnl DAEMON_OPTIONS(`Port=smtp,Addr=127.0.0.1, Name=MTA')dnl
+Change to:
+DAEMON_OPTIONS(`Port=smtp, Name=MTA')dnl
+
+2. Set relay domains:
+vi /etc/mail/relay-domains
+Add your domains:
+example.com
+mydomain.com
+
+3. Configure access control:
+vi /etc/mail/access
+Add allowed hosts:
+Connect:192.168.1       RELAY
+Connect:10.0.0          RELAY
+Connect:example.com     RELAY
+
+Rebuild access database:
+makemap hash /etc/mail/access < /etc/mail/access
+
+4. Rebuild sendmail configuration:
+m4 /etc/mail/sendmail.mc > /etc/mail/sendmail.cf
+
+5. Restart sendmail:
+systemctl restart sendmail
+
+### Sendmail Commands
+
+Send simple email:
+mail -s "Subject Line" recipient@example.com
+Type message here
+Press Ctrl+D to send
+
+Send email with body from command:
+echo "This is the email body" | mail -s "Subject" recipient@example.com
+
+Send email with file content:
+mail -s "Log File" admin@example.com < /var/log/messages
+
+Send email with attachment (requires mailx):
+echo "Please find attachment" | mail -s "Report" -a /path/to/file.pdf admin@example.com
+
+Check mail queue:
+mailq
+or
+sendmail -bp
+
+Process mail queue:
+sendmail -q
+
+Process mail queue in verbose mode:
+sendmail -v -q
+
+Test sendmail:
+telnet localhost 25
+EHLO localhost
+MAIL FROM: sender@example.com
+RCPT TO: recipient@example.com
+DATA
+Subject: Test Email
+This is a test message.
+.
+QUIT
+
+View mail logs:
+tail -f /var/log/maillog
+
+Clear mail queue:
+cd /var/spool/mqueue
+rm -f *
+
+### Sendmail Aliases
+
+Purpose: Redirect emails to different users or addresses
+
+Edit aliases file:
+vi /etc/aliases
+
+Example aliases:
+root:           admin@example.com
+postmaster:     root
+webmaster:      root
+support:        user1,user2,user3
+sales:          "|/usr/local/bin/sales-script.sh"
+backup:         \user1,"/backup/mail-archive"
+
+After editing, rebuild alias database:
+newaliases
+
+Test alias:
+echo "Test" | mail -s "Alias Test" support
+
+---
+
+## 3. Postfix
+
+### What is Postfix?
+
+Postfix is a modern, secure, and easy-to-configure Mail Transfer Agent (MTA) 
+designed as a faster, easier-to-administer, and more secure alternative to Sendmail.
+
+- **Created**: 1998
+- **Developer**: Wietse Venema (IBM)
+- **Original Name**: IBM Secure Mailer → VMailer → Postfix
+- **License**: Open Source (IBM Public License / EPL 2.0)
+- **Market Share**: ~35% (most popular MTA)
+- **Pros**: Easy configuration, secure, fast, well-documented
+- **Cons**: Less flexible than Sendmail for complex scenarios
+
+### Why Postfix Was Created?
+- Sendmail configuration was too complex
+- Sendmail had security vulnerabilities
+- Need for better performance
+- Desire for easier administration
+- Better modular design
+
+### Key Features of Postfix
+✅ **Security**: Runs with minimal privileges, chrooted processes
+✅ **Performance**: Fast, efficient, handles high volume
+✅ **Compatibility**: Drop-in replacement for Sendmail
+✅ **Simple Configuration**: Plain text files, easy to understand
+✅ **Modular Design**: Separate processes for different tasks
+✅ **Reliability**: Robust queue management
+✅ **Spam Control**: Built-in anti-spam features
+✅ **Virtual Domains**: Easy multi-domain hosting
+
+### Postfix Architecture (Modular Design)
+
+┌─────────────────────────────────────────────────────────────────┐
+│                          POSTFIX                                 │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Incoming Mail                                    Outgoing Mail  │
+│       │                                                  │       │
+│       v                                                  v       │
+│  ┌─────────┐      ┌─────────┐      ┌─────────┐   ┌─────────┐  │
+│  │  smtpd  │─────>│ cleanup │─────>│  queue  │<──│  pickup │  │
+│  └─────────┘      └─────────┘      └─────────┘   └─────────┘  │
+│   (SMTP          (Header rewrite)        │        (Local mail) │
+│    Server)                                │                     │
+│                                           v                     │
+│                                    ┌─────────────┐              │
+│                                    │qmgr (Queue  │              │
+│                                    │  Manager)   │              │
+│                                    └─────────────┘              │
+│                                           │                     │
+│                    ┌──────────────────────┼──────────────┐     │
+│                    v                      v               v     │
+│              ┌─────────┐           ┌─────────┐     ┌─────────┐│
+│              │  smtp   │           │  local  │     │ virtual ││
+│              │(Delivery│           │(Delivery│     │(Virtual ││
+│              │ to remote)          │  local) │     │ domains)││
+│              └─────────┘           └─────────┘     └─────────┘│
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+
+Each box is a separate process running with minimal privileges!
+
+### Postfix Components
+
+Component          Function
+──────────────────────────────────────────────────────────────
+master             Master daemon that controls all others
+smtpd              SMTP server (receives incoming mail)
+smtp               SMTP client (sends outgoing mail)
+qmgr               Queue manager (schedules deliveries)
+cleanup            Message processor (rewrites headers)
+pickup             Picks up local submissions
+local              Local delivery agent
+virtual            Virtual domain delivery
+bounce             Handles bounced messages
+trivial-rewrite    Address rewriting and resolving
+postqueue          Queue management interface
+postsuper          Queue maintenance
+postconf           Configuration utility
+
+### Postfix Files and Directories
+
+File/Directory                    Purpose
+─────────────────────────────────────────────────────────────
+/etc/postfix/main.cf              Main configuration file (simple!)
+/etc/postfix/master.cf            Process configuration
+/etc/postfix/access               Access control
+/etc/postfix/virtual              Virtual domain mappings
+/etc/postfix/transport            Transport mappings
+/etc/postfix/header_checks        Header filtering rules
+/etc/postfix/body_checks          Body filtering rules
+/var/spool/postfix                Postfix spool directory
+/var/spool/postfix/maildrop       Mail submission directory
+/var/spool/postfix/active         Active queue
+/var/spool/postfix/deferred       Deferred (retry) queue
+/var/spool/postfix/hold           Held messages
+/var/log/maillog                  Mail logs (RHEL/CentOS)
+/var/log/mail.log                 Mail logs (Debian/Ubuntu)
+
+### Postfix Service Management
+
+Check if postfix is installed:
+rpm -qa | grep postfix
+dpkg -l | grep postfix
+
+Check postfix status:
+systemctl status postfix
+
+Start postfix:
+systemctl start postfix
+
+Stop postfix:
+systemctl stop postfix
+
+Restart postfix:
+systemctl restart postfix
+
+Reload postfix (without dropping connections):
+systemctl reload postfix
+
+Enable postfix on boot:
+systemctl enable postfix
+
+Disable postfix on boot:
+systemctl disable postfix
+
+### Postfix Installation & Configuration (RHEL/CentOS)
+
+Step 1: Login as root
+su -
+
+Step 2: Stop sendmail (if running)
+systemctl stop sendmail
+systemctl disable sendmail
+
+Step 3: Check if postfix is installed
+rpm -qa | grep postfix
+
+Step 4: Install postfix
+yum install postfix mailx
+
+Step 5: Set postfix as default MTA
+alternatives --set mta /usr/sbin/sendmail.postfix
+
+Step 6: Configure postfix
+vi /etc/postfix/main.cf
+
+Step 7: Start postfix
+systemctl start postfix
+systemctl enable postfix
+
+Step 8: Configure firewall
+firewall-cmd --permanent --add-service=smtp
+firewall-cmd --reload
+
+Or for testing, stop firewall:
+systemctl stop firewalld
+systemctl disable firewalld
+
+### Postfix Installation (Debian/Ubuntu)
+
+Update package list:
+apt update
+
+Install postfix:
+apt install postfix
+
+During installation, choose:
+- Internet Site (for direct mail delivery)
+- Enter your system mail name (e.g., example.com)
+
+Start postfix:
+systemctl start postfix
+systemctl enable postfix
+
+### Postfix Basic Configuration
+
+Main configuration file:
+vi /etc/postfix/main.cf
+
+Essential parameters:
+
+1. Hostname settings:
+myhostname = mail.example.com
+mydomain = example.com
+myorigin = $mydomain
+
+2. Network settings:
+inet_interfaces = all
+inet_protocols = ipv4
+
+3. Destination settings:
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+mynetworks = 127.0.0.0/8, 192.168.1.0/24, 10.0.0.0/8
+
+4. Relay settings:
+relayhost = 
+relay_domains = $mydestination
+
+5. Mailbox settings:
+home_mailbox = Maildir/
+
+After changes, reload postfix:
+postfix reload
+
+Verify configuration:
+postfix check
+
+### Postfix Advanced Configuration Examples
+
+Example 1: Configure Relay Host (Use Gmail/Office365 as relay)
+
+Edit main.cf:
+vi /etc/postfix/main.cf
+
+For Gmail:
+relayhost = [smtp.gmail.com]:587
+smtp_use_tls = yes
+smtp_sasl_auth_enable = yes
+smtp_sasl_security_options = noanonymous
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
+
+Create password file:
+vi /etc/postfix/sasl_passwd
+[smtp.gmail.com]:587 your-email@gmail.com:your-app-password
+
+Generate hash:
+postmap /etc/postfix/sasl_passwd
+
+Set permissions:
+chmod 600 /etc/postfix/sasl_passwd*
+
+Reload postfix:
+postfix reload
+
+Example 2: Virtual Domains (Host multiple domains)
+
+Edit main.cf:
+virtual_alias_domains = domain1.com, domain2.com, domain3.com
+virtual_alias_maps = hash:/etc/postfix/virtual
+
+Create virtual mappings:
+vi /etc/postfix/virtual
+
+sales@domain1.com       user1@localhost
+support@domain1.com     user2@localhost
+info@domain2.com        admin@localhost
+@domain3.com            catch-all@localhost
+
+Generate hash:
+postmap /etc/postfix/virtual
+
+Reload postfix:
+postfix reload
+
+Example 3: Sender/Recipient Restrictions (Anti-spam)
+
+Edit main.cf:
+smtpd_recipient_restrictions = 
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    reject_unauth_destination,
+    reject_invalid_hostname,
+    reject_non_fqdn_sender,
+    reject_non_fqdn_recipient,
+    reject_unknown_sender_domain,
+    reject_unknown_recipient_domain,
+    reject_rbl_client zen.spamhaus.org,
+    reject_rbl_client bl.spamcop.net,
+    permit
+
+smtpd_sender_restrictions =
+    reject_unknown_sender_domain,
+    reject_sender_login_mismatch
+
+Example 4: Message Size Limits
+
+Edit main.cf:
+message_size_limit = 10485760        # 10MB
+mailbox_size_limit = 1073741824      # 1GB
+smtpd_recipient_limit = 100
+
+Example 5: Rate Limiting (Prevent spam)
+
+Edit main.cf:
+smtpd_client_connection_count_limit = 10
+smtpd_client_connection_rate_limit = 30
+smtpd_client_message_rate_limit = 100
+
+Example 6: TLS/SSL Encryption
+
+Edit main.cf:
+# TLS for incoming connections (SMTPD)
+smtpd_tls_cert_file = /etc/ssl/certs/mail.example.com.crt
+smtpd_tls_key_file = /etc/ssl/private/mail.example.com.key
+smtpd_tls_security_level = may
+smtpd_tls_auth_only = yes
+
+# TLS for outgoing connections (SMTP)
+smtp_tls_security_level = may
+smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
+
+### Postfix Commands
+
+Send simple email:
+echo "This is the email body" | mail -s "Subject" recipient@example.com
+
+Send email with attachment:
+echo "Please find attachment" | mail -s "Report" -a /path/to/file.pdf user@example.com
+
+Check mail queue:
+postqueue -p
+or
+mailq
+
+Flush mail queue (attempt delivery):
+postqueue -f
+
+Delete all mail from queue:
+postsuper -d ALL
+
+Delete deferred mail:
+postsuper -d ALL deferred
+
+Delete specific message:
+postsuper -d QUEUE-ID
+
+View message details:
+postcat -q QUEUE-ID
+
+Reload configuration:
+postfix reload
+
+Check configuration syntax:
+postfix check
+
+View postfix configuration:
+postconf
+
+View non-default settings:
+postconf -n
+
+View specific parameter:
+postconf myhostname
+
+Change parameter:
+postconf -e 'myhostname = mail.example.com'
+
+Test SMTP connection:
+telnet localhost 25
+EHLO localhost
+MAIL FROM: sender@example.com
+RCPT TO: recipient@example.com
+DATA
+Subject: Test Email
+This is test message.
+.
+QUIT
+
+View mail logs:
+tail -f /var/log/maillog          # RHEL/CentOS
+tail -f /var/log/mail.log          # Debian/Ubuntu
+
+Search logs for specific email:
+grep "recipient@example.com" /var/log/maillog
+
+Check postfix queue statistics:
+qshape active
+qshape deferred
+
+### Postfix Aliases (Same as Sendmail)
+
+Edit aliases:
+vi /etc/aliases
+
+root:           admin@example.com
+postmaster:     root
+support:        user1,user2,user3
+
+Rebuild database:
+newaliases
+or
+postalias /etc/aliases
+
+---
+
+## 4. Sendmail vs Postfix Comparison
+
+Feature                 Sendmail                    Postfix
+────────────────────────────────────────────────────────────────────
+Age                     1979 (oldest)               1998 (modern)
+Configuration           Very complex                Simple, intuitive
+Main Config File        sendmail.cf (cryptic)       main.cf (readable)
+Configuration Syntax    M4 macros                   Parameter = value
+Learning Curve          Steep                       Gentle
+Security                Historical issues           Designed secure
+Performance             Good                        Excellent
+Modularity              Monolithic                  Highly modular
+Default Privileges      Runs as root                Minimal privileges
+Market Share            ~10% (declining)            ~35% (growing)
+Documentation           Extensive but complex       Excellent, clear
+Compatibility           Standard                    Sendmail-compatible
+Queue Management        Basic                       Advanced
+Virtual Domains         Supported                   Better support
+Spam Control            Limited built-in            Better built-in
+Ease of Administration  Difficult                   Easy
+Community Support       Legacy                      Active
+Best For                Complex routing             General purpose
+Configuration Changes   Compile needed              Reload sufficient
+Debugging               Harder                      Easier
+
+### When to Use Sendmail?
+✅ Legacy systems (already configured)
+✅ Extremely complex mail routing requirements
+✅ Organization policy mandates it
+✅ Advanced mail transformations needed
+✅ You have expert Sendmail administrators
+
+### When to Use Postfix?
+✅ New mail server deployments
+✅ Security is a priority
+✅ Easy configuration preferred
+✅ Modern features needed
+✅ Better performance required
+✅ Virtual domain hosting
+✅ Better spam control needed
+✅ Most common use cases
+
+### Migration from Sendmail to Postfix
+
+Why migrate?
+- Better security
+- Easier management
+- Better performance
+- Modern features
+- Active development
+
+Migration steps:
+
+Step 1: Backup current configuration
+cp -r /etc/mail /root/sendmail-backup
+cp /etc/aliases /root/aliases-backup
+
+Step 2: Document current settings
+mailq > /root/queue-before.txt
+cat /etc/aliases > /root/aliases-before.txt
+
+Step 3: Stop sendmail
+systemctl stop sendmail
+systemctl disable sendmail
+
+Step 4: Install postfix
+yum install postfix
+
+Step 5: Set postfix as default
+alternatives --set mta /usr/sbin/sendmail.postfix
+
+Step 6: Migrate aliases
+cp /etc/aliases /etc/aliases.postfix
+newaliases
+
+Step 7: Configure postfix
+vi /etc/postfix/main.cf
+# Configure based on old sendmail settings
+
+Step 8: Test configuration
+postfix check
+
+Step 9: Start postfix
+systemctl start postfix
+systemctl enable postfix
+
+Step 10: Monitor logs
+tail -f /var/log/maillog
+
+Step 11: Test email delivery
+echo "Test migration" | mail -s "Test" admin@example.com
+
+---
+
+## 5. Daily Use Cases
+
+### Use Case 1: Server Monitoring Alerts
+
+Scenario: Send automated alerts when server resources are high
+
+Script: /usr/local/bin/monitor-alert.sh
+
+#!/bin/bash
+THRESHOLD=80
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | awk '{print $2}' | cut -d'%' -f1)
+DISK_USAGE=$(df -h / | tail -1 | awk '{print $5}' | cut -d'%' -f1)
+
+if [ $(echo "$CPU_USAGE > $THRESHOLD" | bc) -eq 1 ]; then
+    echo "CPU usage is ${CPU_USAGE}% - Above threshold!" | \
+    mail -s "ALERT: High CPU Usage on $(hostname)" admin@company.com
+fi
+
+if [ $DISK_USAGE -gt $THRESHOLD ]; then
+    echo "Disk usage is ${DISK_USAGE}% - Above threshold!" | \
+    mail -s "ALERT: High Disk Usage on $(hostname)" admin@company.com
+fi
+
+Add to crontab (check every 5 minutes):
+crontab -e
+*/5 * * * * /usr/local/bin/monitor-alert.sh
+
+Real-Life Example:
+- Production server CPU spikes to 95%
+- Script detects high usage
+- Email alert sent to admin immediately
+- Admin logs in and investigates issue
+- Problem resolved before users complain
+
+### Use Case 2: Automated Backup Reports
+
+Scenario: Email backup status after nightly backups
+
+Script: /backup/scripts/backup-and-notify.sh
+
+#!/bin/bash
+BACKUP_DIR="/backup/daily"
+DATE=$(date +%Y-%m-%d)
+LOG_FILE="/var/log/backup_${DATE}.log"
+ADMIN_EMAIL="backup-admin@company.com"
+
+# Perform backup
+echo "Starting backup at $(date)" > $LOG_FILE
+tar -czf ${BACKUP_DIR}/backup_${DATE}.tar.gz /var/www /etc >> $LOG_FILE 2>&1
+
+if [ $? -eq 0 ]; then
+    SIZE=$(du -h ${BACKUP_DIR}/backup_${DATE}.tar.gz | cut -f1)
+    
+    mail -s "✅ Backup SUCCESS - ${DATE} - ${SIZE}" $ADMIN_EMAIL <<EOF
+Backup completed successfully!
+
+Date: ${DATE}
+Size: ${SIZE}
+Location: ${BACKUP_DIR}/backup_${DATE}.tar.gz
+Server: $(hostname)
+
+Backup Log:
+$(cat $LOG_FILE)
+EOF
+else
+    mail -s "❌ Backup FAILED - ${DATE}" $ADMIN_EMAIL <<EOF
+Backup FAILED!
+
+Date: ${DATE}
+Server: $(hostname)
+
+Error Log:
+$(cat $LOG_FILE)
+
+Please investigate immediately!
+EOF
+fi
+
+Add to crontab (run at 2 AM daily):
+0 2 * * * /backup/scripts/backup-and-notify.sh
+
+Real-Life Example:
+- Backup runs every night at 2 AM
+- Admin receives email every morning with status
+- If backup fails, immediate alert sent
+- Admin can quickly identify and fix issues
+
+### Use Case 3: Application Error Notifications
+
+Scenario: Alert developers when application errors occur
+
+Script: /var/www/app/scripts/error-monitor.sh
+
+#!/bin/bash
+ERROR_LOG="/var/log/application/error.log"
+TMP_FILE="/tmp/last-errors.tmp"
+RECIPIENTS="dev-team@company.com"
+
+# Get errors from last 5 minutes
+NEW_ERRORS=$(find $ERROR_LOG -mmin -5 -exec tail -100 {} \; | grep -i error)
+
+if [ ! -z "$NEW_ERRORS" ]; then
+    COUNT=$(echo "$NEW_ERRORS" | wc -l)
+    
+    mail -s "⚠️  Application Errors Detected: ${COUNT} errors" $RECIPIENTS <<EOF
+Application error(s) detected in the last 5 minutes.
+
+Server: $(hostname)
+Application: Production Web App
+Time: $(date)
+Error Count: ${COUNT}
+
+Recent Errors:
+──────────────────────────────────────────────────────
+${NEW_ERRORS}
+──────────────────────────────────────────────────────
+
+Please investigate ASAP!
+EOF
+fi
+
+Add to crontab (check every 5 minutes):
+*/5 * * * * /var/www/app/scripts/error-monitor.sh
+
+Real-Life Example:
+- Application encounters database connection error
+- Error logged to error.log
+- Script detects error within 5 minutes
+- Dev team receives email with error details
+- Team investigates and fixes database issue
+
+### Use Case 4: User Account Notifications
+
+Scenario: Send welcome email when new user account is created
+
+Script: /usr/local/bin/new-user-notification.sh
+
+#!/bin/bash
+USERNAME=$1
+USER_EMAIL=$2
+TEMP_PASSWORD=$3
+
+mail -s "Welcome to Our System - Account Created" $USER_EMAIL <<EOF
+Hello $USERNAME,
+
+Your account has been successfully created!
+
+Login Details:
+──────────────────────────────────
+Username: $USERNAME
+Temporary Password: $TEMP_PASSWORD
+Server: $(hostname)
+SSH Access: ssh $USERNAME@$(hostname -f)
+
+Important:
+- Please change your password after first login
+- Use 'passwd' command to change password
+- Your password must be at least 12 characters
+
+If you have any questions, contact: support@company.com
+
+Best regards,
+System Administration Team
+EOF
+
+# Also notify admin
+echo "New account created: $USERNAME" | \
+mail -s "New User Account: $USERNAME" admin@company.com
+
+Usage:
+./new-user-notification.sh john.doe john.doe@company.com "TempPass123!"
+
+Real-Life Example:
+- HR requests new developer account
+- Admin creates account: useradd newdev
+- Script sends welcome email to new developer
+- Developer receives login credentials
+- Admin receives confirmation of account creation
+
+### Use Case 5: SSL Certificate Expiry Alerts
+
+Scenario: Monitor SSL certificates and alert before expiry
+
+Script: /usr/local/bin/ssl-expiry-check.sh
+
+#!/bin/bash
+DOMAINS=("example.com" "api.example.com" "mail.example.com")
+ALERT_DAYS=30
+ADMIN_EMAIL="security@company.com"
+
+for DOMAIN in "${DOMAINS[@]}"; do
+    # Get certificate expiry date
+    EXPIRY_DATE=$(echo | openssl s_client -servername $DOMAIN \
+                  -connect $DOMAIN:443 2>/dev/null | \
+                  openssl x509 -noout -enddate 2>/dev/null | \
+                  cut -d= -f2)
+    
+    # Convert to epoch
+    EXPIRY_EPOCH=$(date -d "$EXPIRY_DATE" +%s)
+    NOW_EPOCH=$(date +%s)
+    DAYS_LEFT=$(( ($EXPIRY_EPOCH - $NOW_EPOCH) / 86400 ))
+    
+    if [ $DAYS_LEFT -lt $ALERT_DAYS ]; then
+        mail -s "🚨 SSL Certificate Expiring Soon: $DOMAIN" $ADMIN_EMAIL <<EOF
+SSL Certificate Alert!
+
+Domain: $DOMAIN
+Expiry Date: $EXPIRY_DATE
+Days Remaining: $DAYS_LEFT
+
+Action Required:
+Renew SSL certificate before expiration!
+
+Certificate Details:
+$(echo | openssl s_client -servername $DOMAIN -connect $DOMAIN:443 2>/dev/null | openssl x509 -noout -text)
+EOF
+    fi
+done
+
+Add to crontab (check weekly):
+0 9 * * 1 /usr/local/bin/ssl-expiry-check.sh
+
+Real-Life Example:
+- Certificate expires in 20 days
+- Weekly check detects approaching expiry
+- Email alert sent to security team
+- Team renews certificate proactively
+- No website downtime occurs
+
+### Use Case 6: Database Backup Notifications
+
+Scenario: Email database dump status
+
+Script: /backup/scripts/db-backup.sh
+
+#!/bin/bash
+DATE=$(date +%Y-%m-%d_%H-%M-%S)
+BACKUP_DIR="/backup/databases"
+DB_NAME="production_db"
+DB_USER="backup_user"
+DB_PASS="secure_password"
+ADMIN_EMAIL="dba@company.com"
+
+# Perform database backup
+mysqldump -u $DB_USER -p$DB_PASS $DB_NAME | \
+gzip > ${BACKUP_DIR}/${DB_NAME}_${DATE}.sql.gz
+
+if [ $? -eq 0 ]; then
+    SIZE=$(du -h ${BACKUP_DIR}/${DB_NAME}_${DATE}.sql.gz | cut -f1)
+    ROWS=$(zcat ${BACKUP_DIR}/${DB_NAME}_${DATE}.sql.gz | \
+           grep -c "INSERT INTO")
+    
+    mail -s "✅ Database Backup Completed: $DB_NAME" $ADMIN_EMAIL <<EOF
+Database backup completed successfully!
+
+Database: $DB_NAME
+Date: $DATE
+Size: $SIZE
+Approximate Rows: $ROWS
+Location: ${BACKUP_DIR}/${DB_NAME}_${DATE}.sql.gz
+Server: $(hostname)
+
+Backup is ready for archival/replication.
+EOF
+else
+    mail -s "❌ Database Backup FAILED: $DB_NAME" $ADMIN_EMAIL <<EOF
+CRITICAL: Database backup failed!
+
+Database: $DB_NAME
+Date: $DATE
+Server: $(hostname)
+
+Please investigate immediately!
+Check MySQL logs: /var/log/mysqld.log
+EOF
+fi
+
+Add to crontab (daily at 3 AM):
+0 3 * * * /backup/scripts/db-backup.sh
+
+### Use Case 7: Security Incident Alerts
+
+Scenario: Alert security team about failed login attempts
+
+Script: /usr/local/bin/security-monitor.sh
+
+#!/bin/bash
+LOGFILE="/var/log/secure"
+THRESHOLD=5
+SECURITY_EMAIL="security@company.com"
+
+# Check failed SSH attempts in last hour
+FAILED_ATTEMPTS=$(grep "Failed password" $LOGFILE | \
+                  grep "$(date '+%b %e %H')" | wc -l)
+
+if [ $FAILED_ATTEMPTS -gt $THRESHOLD ]; then
+    # Extract attacking IPs
+    ATTACK_IPS=$(grep "Failed password" $LOGFILE | \
+                 grep "$(date '+%b %e %H')" | \
+                 awk '{print $(NF-3)}' | sort | uniq -c | sort -rn)
+    
+    mail -s "🚨 SECURITY ALERT: Multiple Failed Login Attempts" $SECURITY_EMAIL <<EOF
+Security Alert: Possible Brute Force Attack
+
+Server: $(hostname)
+Time: $(date)
+Failed Login Attempts (last hour): $FAILED_ATTEMPTS
+Threshold: $THRESHOLD
+
+Attacking IP Addresses:
+──────────────────────────────────────────────────────
+$ATTACK_IPS
+──────────────────────────────────────────────────────
+
+Recent Failed Attempts:
+$(grep "Failed password" $LOGFILE | grep "$(date '+%b %e %H')" | tail -20)
+
+Recommended Actions:
+1. Review and block suspicious IPs
+2. Check for compromised accounts
+3. Consider implementing fail2ban
+4. Review security policies
+
+Alert generated by: $(hostname) security monitoring
+EOF
+fi
+
+Add to crontab (check hourly):
+0 * * * * /usr/local/bin/security-monitor.sh
+
+### Use Case 8: Cron Job Failure Notifications
+
+Scenario: Get notified when scheduled jobs fail
+
+Method 1: Use MAILTO in crontab
+crontab -e
+
+MAILTO=admin@company.com
+0 2 * * * /backup/scripts/important-backup.sh
+
+# Any output (especially errors) will be emailed
+
+Method 2: Explicit error handling
+0 2 * * * /backup/scripts/important-backup.sh || \
+echo "Backup script failed!" | \
+mail -s "CRON JOB FAILED: important-backup.sh" admin@company.com
+
+Method 3: Success/Failure wrapper
+Script: /usr/local/bin/cron-wrapper.sh
+
+#!/bin/bash
+SCRIPT=$1
+DESCRIPTION=$2
+ADMIN_EMAIL="admin@company.com"
+
+OUTPUT=$($SCRIPT 2>&1)
+EXIT_CODE=$?
+
+if [ $EXIT_CODE -ne 0 ]; then
+    mail -s "❌ CRON FAILED: $DESCRIPTION" $ADMIN_EMAIL <<EOF
+Cron job failed!
+
+Script: $SCRIPT
+Description: $DESCRIPTION
+Exit Code: $EXIT_CODE
+Time: $(date)
+Server: $(hostname)
+
+Output:
+──────────────────────────────────────────────────────
+$OUTPUT
+──────────────────────────────────────────────────────
+EOF
+fi
+
+Usage in crontab:
+0 2 * * * /usr/local/bin/cron-wrapper.sh /backup/scripts/backup.sh "Daily Backup"
+
+### Use Case 9: Web Application Contact Forms
+
+Scenario: Process contact form submissions from website
+
+PHP Script: /var/www/html/contact-process.php
+
+<?php
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    $name = htmlspecialchars($_POST['name']);
+    $email = htmlspecialchars($_POST['email']);
+    $message = htmlspecialchars($_POST['message']);
+    
+    $to = "sales@company.com";
+    $subject = "New Contact Form Submission from $name";
+    
+    $body = "New contact form submission:\n\n";
+    $body .= "Name: $name\n";
+    $body .= "Email: $email\n";
+    $body .= "Message:\n$message\n\n";
+    $body .= "Submitted: " . date('Y-m-d H:i:s') . "\n";
+    $body .= "IP Address: " . $_SERVER['REMOTE_ADDR'];
+    
+    $headers = "From: noreply@company.com\r\n";
+    $headers .= "Reply-To: $email\r\n";
+    
+    if (mail($to, $subject, $body, $headers)) {
+        echo "Thank you! Your message has been sent.";
+    } else {
+        echo "Sorry, there was an error sending your message.";
+    }
+}
+?>
+
+Real-Life Example:
+- Customer visits company website
+- Fills out contact form with question
+- Submits form
+- PHP processes submission via Postfix/Sendmail
+- Sales team receives email immediately
+- Team responds to customer inquiry
+
+### Use Case 10: Server Reboot Notifications
+
+Scenario: Notify admins when server reboots
+
+Method 1: Add to rc.local or systemd service
+Script: /usr/local/bin/reboot-notify.sh
+
+#!/bin/bash
+ADMIN_EMAIL="admin@company.com"
+HOSTNAME=$(hostname)
+IP_ADDRESS=$(hostname -I | awk '{print $1}')
+UPTIME=$(uptime)
+
+sleep 60  # Wait for network to be fully up
+
+mail -s "🔄 Server Rebooted: $HOSTNAME" $ADMIN_EMAIL <<EOF
+Server has rebooted!
+
+Server: $HOSTNAME
+IP Address: $IP_ADDRESS
+Reboot Time: $(date)
+Current Uptime: $UPTIME
+
+Last Logged in Users Before Reboot:
+$(last -n 10)
+
+System Information:
+$(uname -a)
+
+Please verify all services are running:
+- Web Server: $(systemctl is-active httpd)
+- Database: $(systemctl is-active mysqld)
+- Mail Server: $(systemctl is-active postfix)
+
+This is an automated notification.
+EOF
+
+Add to crontab:
+@reboot /usr/local/bin/reboot-notify.sh
+
+Real-Life Example:
+- Data center power outage occurs
+- Server reboots automatically when power restored
+- Admin receives email notification
+- Admin checks services remotely
+- Verifies everything is operational
+
+---
+
+## 6. Real-Life Examples & Scenarios
+
+### Scenario 1: "Email Not Being Delivered" - Troubleshooting
+
+Problem: User reports emails from server not arriving
+
+For Postfix:
+
+Step 1: Check if postfix is running
+systemctl status postfix
+
+Step 2: Check mail queue
+postqueue -p
+
+Step 3: View recent log entries
+tail -50 /var/log/maillog | grep RECIPIENT@example.com
+
+Step 4: Test local delivery
+echo "Test" | mail -s "Local Test" root
+mail  # Check local mail
+
+Step 5: Test external delivery with verbose logging
+echo "Test" | mail -v -s "External Test" external@gmail.com
+
+Step 6: Check for errors in log
+grep "error\|warning\|reject" /var/log/maillog | tail -20
+
+Step 7: Test SMTP manually
+telnet localhost 25
+EHLO localhost
+MAIL FROM: test@yourdomain.com
+RCPT TO: recipient@example.com
+DATA
+Subject: Manual test
+This is a test
+.
+QUIT
+
+For Sendmail:
+
+Check sendmail queue:
+mailq
+
+Check sendmail status:
+systemctl status sendmail
+
+View sendmail logs:
+tail -f /var/log/maillog
+
+Common Issues & Solutions:
+
+Issue 1: Relaying denied
+Log: Relay access denied
+
+Solution for Postfix:
+vi /etc/postfix/main.cf
+mynetworks = 127.0.0.0/8, 192.168.1.0/24
+postfix reload
+
+Solution for Sendmail:
+vi /etc/mail/access
+Connect:192.168.1    RELAY
+makemap hash /etc/mail/access < /etc/mail/access
+systemctl restart sendmail
+
+Issue 2: Mail stuck in queue
+Log: Connection timed out
+
+Solution:
+# Check network connectivity
+ping mx-record-of-destination.com
+
+# Flush queue (retry delivery)
+postqueue -f  # Postfix
+sendmail -q   # Sendmail
+
+# If persistent, delete stuck messages
+postsuper -d ALL deferred  # Postfix
+
+Issue 3: SPF/DKIM failures
+Log: SPF check failed
+
+Solution:
+- Configure SPF record in DNS
+- Set up DKIM signing
+- Configure proper reverse DNS (PTR record)
+
+### Scenario 2: Setting Up Email Relay Through Gmail
+
+Problem: Small server needs to send emails but doesn't have dedicated mail infrastructure
+
+Solution: Use Gmail as relay (Postfix example)
+
+Step 1: Enable 2-Step Verification in Gmail
+- Go to Google Account Security
+- Enable 2-Step Verification
+
+Step 2: Generate App Password
+- Go to Security → App passwords
+- Generate password for "Mail" application
+- Save the 16-character password
+
+Step 3: Install required packages
+yum install postfix mailx cyrus-sasl-plain
+
+Step 4: Configure Postfix
+vi /etc/postfix/main.cf
+
+relayhost = [smtp.gmail.com]:587
+smtp_use_tls = yes
+smtp_sasl_auth_enable = yes
+smtp_sasl_security_options = noanonymous
+smtp_sasl_password_maps = hash:/etc/postfix/sasl_passwd
+smtp_tls_CAfile = /etc/ssl/certs/ca-bundle.crt
+smtp_tls_session_cache_database = btree:/var/lib/postfix/smtp_scache
+
+Step 5: Create SASL password file
+vi /etc/postfix/sasl_passwd
+
+[smtp.gmail.com]:587 your-email@gmail.com:your-app-password
+
+Step 6: Secure and hash the file
+chmod 600 /etc/postfix/sasl_passwd
+postmap /etc/postfix/sasl_passwd
+
+Step 7: Restart Postfix
+systemctl restart postfix
+
+Step 8: Test
+echo "Test via Gmail relay" | mail -s "Test" recipient@example.com
+
+Step 9: Verify in logs
+tail -f /var/log/maillog
+
+Expected log output:
+status=sent (250 2.0.0 OK)
+
+Real-Life Example:
+- Startup company has AWS EC2 instance
+- Needs to send notification emails
+- Can't afford dedicated mail server
+- Configures Gmail relay in 10 minutes
+- All notification emails route through Gmail
+- Cost: Free (within Gmail sending limits)
+
+### Scenario 3: Multiple Departments, Different Aliases
+
+Problem: Route emails to appropriate teams based on address
+
+Solution: Configure aliases
+
+Edit /etc/aliases:
+vi /etc/aliases
+
+# Management
+ceo:            john.smith@company.com
+cfo:            jane.doe@company.com
+
+# IT Department
+admin:          it-team@company.com
+root:           it-team@company.com
+postmaster:     it-team@company.com
+hostmaster:     it-team@company.com
+
+# Support Teams
+support:        support-team1,support-team2,support-team3
+helpdesk:       "|/usr/local/bin/ticket-system.sh"
+sales:          sales-group@company.com,crm@company.com
+billing:        accounts@company.com,billing@company.com
+
+# Special Handling
+backup-reports: "|/backup/scripts/process-report.sh"
+monitoring:     \admin,/var/log/monitoring-emails.log
+
+# Archive Everything
+archive:        \user1,"|/archive/scripts/archive-mail.sh"
+
+Rebuild aliases database:
+newaliases  # Works for both Postfix and Sendmail
+
+Test:
+echo "Test to sales" | mail -s "Test" sales
+
+Real-Life Example:
+- Customer emails support@company.com
+- Email automatically forwarded to 3 support team members
+- All three see the email simultaneously
+- First available person responds
+- Also logged to ticketing system via script
+- No emails missed, fast response time
+
+### Scenario 4: Blocking Spam Senders
+
+Problem: Receiving spam from specific domains/IPs
+
+Solution for Postfix:
+
+Method 1: Using access restrictions
+vi /etc/postfix/main.cf
+
+smtpd_client_restrictions = 
+    check_client_access hash:/etc/postfix/client_access,
+    permit
+
+Create access file:
+vi /etc/postfix/client_access
+
+spam-domain.com                 REJECT
+another-spammer.com             REJECT
+123.456.789.0                   REJECT
+192.168.50                      REJECT
+
+Hash the file:
+postmap /etc/postfix/client_access
+
+Reload:
+postfix reload
+
+Method 2: Using header checks
+vi /etc/postfix/main.cf
+
+header_checks = regexp:/etc/postfix/header_checks
+
+Create header checks:
+vi /etc/postfix/header_checks
+
+/^From:.*@spam-domain\.com/    REJECT
+/^Subject:.*FREE VIAGRA/        REJECT
+/^Subject:.*BUY NOW/            REJECT
+
+Reload:
+postfix reload
+
+Method 3: Using RBL (Real-time Blackhole Lists)
+vi /etc/postfix/main.cf
+
+smtpd_recipient_restrictions =
+    permit_mynetworks,
+    reject_rbl_client zen.spamhaus.org,
+    reject_rbl_client bl.spamcop.net,
+    permit
+
+Solution for Sendmail:
+
+vi /etc/mail/access
+
+spam-domain.com          REJECT
+another-spammer.com      REJECT
+123.456.789.0            REJECT
+
+makemap hash /etc/mail/access < /etc/mail/access
+systemctl restart sendmail
+
+### Scenario 5: Email Forwarder Server
+
+Problem: Create a mail forwarder that doesn't store mail locally
+
+Solution with Postfix:
+
+Configure as relay only:
+vi /etc/postfix/main.cf
+
+# Basic settings
+myhostname = mail-relay.company.com
+mydomain = company.com
+myorigin = $mydomain
+
+# Don't receive mail for local delivery
+mydestination = 
+local_recipient_maps =
+
+# Relay everything to main mail server
+relayhost = [main-mail-server.company.com]
+
+# Allow relay from local networks only
+mynetworks = 127.0.0.0/8, 192.168.1.0/24
+smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination
+
+# No local delivery
+local_transport = error:local delivery is disabled
+
+Reload:
+postfix reload
+
+Real-Life Example:
+- Branch office needs to send emails
+- All emails should go through HQ mail server
+- Branch office has simple relay server
+- No local storage, just forward everything
+- Centralized management and archival at HQ
+
+### Scenario 6: Virtual Email Hosting (Multiple Domains)
+
+Problem: Host email for multiple domains on one server
+
+Solution with Postfix:
+
+Step 1: Configure virtual domains
+vi /etc/postfix/main.cf
+
+virtual_alias_domains = domain1.com, domain2.com, domain3.com
+virtual_alias_maps = hash:/etc/postfix/virtual
+
+Step 2: Create virtual mappings
+vi /etc/postfix/virtual
+
+# Domain 1
+info@domain1.com        user1@mainserver.com
+sales@domain1.com       user2@mainserver.com
+support@domain1.com     user3@mainserver.com
+
+# Domain 2
+contact@domain2.com     user4@mainserver.com
+admin@domain2.com       user5@mainserver.com
+
+# Domain 3 - Catch-all
+@domain3.com            catchall@mainserver.com
+
+Step 3: Hash and reload
+postmap /etc/postfix/virtual
+postfix reload
+
+Step 4: Test
+echo "Test virtual" | mail -s "Test" info@domain1.com
+
+Real-Life Example:
+- Web hosting company manages 50 client domains
+- Each domain has email services
+- One Postfix server handles all domains
+- Emails routed to appropriate mailboxes
+- Easy to add new domains/addresses
+
+### Scenario 7: Email with Attachment from Command Line
+
+Problem: Need to send files via email from scripts
+
+Solution:
+
+Method 1: Using mail command with -a
+echo "Please find attached" | mail -s "Report" -a /path/to/report.pdf admin@company.com
+
+Method 2: Multiple attachments
+echo "Monthly reports" | mail -s "Reports" \
+  -a /reports/sales.pdf \
+  -a /reports/finance.pdf \
+  -a /reports/hr.pdf \
+  admin@company.com
+
+Method 3: Using mutt (if available)
+echo "Body text" | mutt -s "Subject" -a /path/to/file.pdf -- recipient@example.com
+
+Method 4: Using sendmail with MIME encoding
+Script: send-attachment.sh
+
+#!/bin/bash
+TO="$1"
+SUBJECT="$2"
+BODY="$3"
+ATTACHMENT="$4"
+BOUNDARY="MULTIPART-MIXED-BOUNDARY"
+
+(
+  echo "To: $TO"
+  echo "Subject: $SUBJECT"
+  echo "MIME-Version: 1.0"
+  echo "Content-Type: multipart/mixed; boundary=\"$BOUNDARY\""
+  echo ""
+  echo "--$BOUNDARY"
+  echo "Content-Type: text/plain; charset=UTF-8"
+  echo ""
+  echo "$BODY"
+  echo ""
+  echo "--$BOUNDARY"
+  echo "Content-Type: application/octet-stream; name=\"$(basename $ATTACHMENT)\""
+  echo "Content-Transfer-Encoding: base64"
+  echo "Content-Disposition: attachment; filename=\"$(basename $ATTACHMENT)\""
+  echo ""
+  base64 $ATTACHMENT
+  echo ""
+  echo "--$BOUNDARY--"
+) | sendmail -t
+
+Usage:
+./send-attachment.sh admin@company.com "Daily Report" "Please review" /reports/daily.pdf
+
+Real-Life Example:
+- Automated report generation runs at midnight
+- Generates PDF report
+- Emails report to management team
+- Management receives email with PDF attachment
+- No manual intervention needed
+
+### Scenario 8: Debugging Mail Delivery Issues
+
+Problem: Email sent but never received
+
+Debugging Steps:
+
+Step 1: Verify email was actually sent
+postqueue -p  # Postfix
+mailq         # Sendmail
+
+Step 2: Check logs for the specific email
+grep "recipient@example.com" /var/log/maillog
+
+Look for:
+- status=sent (successful)
+- status=bounced (rejected by recipient)
+- status=deferred (temporary failure, will retry)
+- Connection refused
+- Relay access denied
+
+Step 3: Check if blocked by firewall
+telnet recipient-mx-server.com 25
+
+Step 4: Verify DNS/MX records
+dig MX example.com
+nslookup -type=MX example.com
+
+Step 5: Check SPF records
+dig TXT example.com | grep spf
+
+Step 6: Test SMTP connection to recipient's server
+telnet mx.example.com 25
+EHLO yourdomain.com
+MAIL FROM: your@domain.com
+RCPT TO: recipient@example.com
+QUIT
+
+Step 7: Check reverse DNS (PTR record)
+host YOUR_SERVER_IP
+
+Should return your mail server hostname
+
+Step 8: Verify not blacklisted
+Check on: https://mxtoolbox.com/blacklists.aspx
+
+Common Issues Found:
+
+Issue: status=bounced (User unknown)
+Cause: Recipient email doesn't exist
+Solution: Verify recipient address
+
+Issue: status=deferred (Connection timed out)
+Cause: Network/firewall blocking
+Solution: Check firewall, network connectivity
+
+Issue: Rejected due to SPF
+Cause: SPF record doesn't include your server
+Solution: Add your server IP to SPF record:
+v=spf1 ip4:YOUR.SERVER.IP include:_spf.google.com ~all
+
+Issue: Marked as spam
+Cause: Missing DKIM, poor reputation
+Solution: Configure DKIM signing, improve sender reputation
+
+---
+
+## 7. Installation & Configuration Summary
+
+### Postfix Complete Setup (Production-Ready)
+
+# Remove sendmail
+yum remove sendmail
+
+# Install postfix
+yum install postfix mailx cyrus-sasl-plain
+
+# Set as default MTA
+alternatives --set mta /usr/sbin/sendmail.postfix
+
+# Backup original config
+cp /etc/postfix/main.cf /etc/postfix/main.cf.orig
+
+# Configure main.cf
+vi /etc/postfix/main.cf
+
+# Essential Settings:
+myhostname = mail.example.com
+mydomain = example.com
+myorigin = $mydomain
+inet_interfaces = all
+inet_protocols = ipv4
+mydestination = $myhostname, localhost.$mydomain, localhost, $mydomain
+mynetworks = 127.0.0.0/8, 192.168.1.0/24
+home_mailbox = Maildir/
+smtpd_banner = $myhostname ESMTP
+
+# Security Settings:
+smtpd_recipient_restrictions = 
+    permit_mynetworks,
+    permit_sasl_authenticated,
+    reject_unauth_destination,
+    reject_invalid_hostname,
+    reject_unknown_sender_domain,
+    reject_unknown_recipient_domain
+
+# Message Limits:
+message_size_limit = 10485760
+mailbox_size_limit = 1073741824
+
+# Check configuration
+postfix check
+
+# Start and enable
+systemctl start postfix
+systemctl enable postfix
+
+# Configure firewall
+firewall-cmd --permanent --add-service=smtp
+firewall-cmd --reload
+
+# Test
+echo "Test email body" | mail -s "Test Subject" user@example.com
+
+# Monitor logs
+tail -f /var/log/maillog
+
+### Sendmail Complete Setup (Legacy Systems)
+
+# Install sendmail
+yum install sendmail sendmail-cf m4
+
+# Backup original config
+cp /etc/mail/sendmail.mc /etc/mail/sendmail.mc.orig
+
+# Edit sendmail.mc
+vi /etc/mail/sendmail.mc
+
+# Comment out this line (allow external connections):
+dnl DAEMON_OPTIONS(`Port=smtp,Addr=127.0.0.1, Name=MTA')dnl
+
+# Add this line:
+DAEMON_OPTIONS(`Port=smtp, Name=MTA')dnl
+
+# Compile configuration
+m4 /etc/mail/sendmail.mc > /etc/mail/sendmail.cf
+
+# Configure relay
+vi /etc/mail/relay-domains
+example.com
+
+# Configure access
+vi /etc/mail/access
+Connect:192.168.1    RELAY
+
+makemap hash /etc/mail/access < /etc/mail/access
+
+# Start and enable
+systemctl start sendmail
+systemctl enable sendmail
+
+# Configure firewall
+firewall-cmd --permanent --add-service=smtp
+firewall-cmd --reload
+
+# Test
+echo "Test" | mail -s "Test" user@example.com
+
+# Monitor logs
+tail -f /var/log/maillog
+
+---
+
+## 8. Troubleshooting Guide
+
+### Common Problems & Solutions
+
+Problem 1: Postfix won't start
+
+Check status:
+systemctl status postfix -l
+
+Check configuration:
+postfix check
+
+View detailed logs:
+journalctl -xe -u postfix
+
+Common causes:
+- Syntax error in main.cf
+- Port 25 already in use
+- Permission issues
+
+Solutions:
+# Check syntax
+postfix check
+
+# Check port usage
+netstat -tulpn | grep :25
+lsof -i :25
+
+# Fix permissions
+chown -R postfix:postfix /var/spool/postfix
+
+Problem 2: Mail stuck in queue
+
+Check queue:
+postqueue -p
+
+View specific message:
+postcat -q QUEUE_ID
+
+Common causes:
+- Network connectivity issues
+- Recipient server down
+- DNS problems
+
+Solutions:
+# Retry delivery
+postqueue -f
+
+# Delete specific message
+postsuper -d QUEUE_ID
+
+# Delete all deferred
+postsuper -d ALL deferred
+
+Problem 3: Cannot send to external addresses
+
+Symptoms: Local delivery works, external fails
+
+Check logs:
+grep "relay" /var/log/maillog
+
+Common cause: Relay restrictions
+
+Solution (Postfix):
+vi /etc/postfix/main.cf
+mynetworks = 127.0.0.0/8, YOUR.NETWORK.IP/24
+postfix reload
+
+Problem 4: Receiving "Relay access denied"
+
+Cause: Sender not in authorized networks
+
+Solution (Postfix):
+vi /etc/postfix/main.cf
+mynetworks = 127.0.0.0/8, 192.168.1.0/24
+postfix reload
+
+Solution (Sendmail):
+vi /etc/mail/access
+Connect:192.168.1    RELAY
+makemap hash /etc/mail/access < /etc/mail/access
+systemctl restart sendmail
+
+Problem 5: Emails going to spam
+
+Common causes:
+- Missing SPF record
+- No DKIM signing
+- Missing reverse DNS
+- Poor sender reputation
+- Blacklisted IP
+
+Solutions:
+
+1. Add SPF record (in DNS):
+v=spf1 mx ip4:YOUR.SERVER.IP ~all
+
+2. Configure DKIM (using OpenDKIM):
+yum install opendkim
+# Configure DKIM signing
+
+3. Set up reverse DNS (PTR record):
+Contact your hosting provider to set:
+YOUR.SERVER.IP → mail.yourdomain.com
+
+4. Check blacklists:
+Visit: https://mxtoolbox.com/blacklists.aspx
+Request delisting if found
+
+Problem 6: Cannot receive emails
+
+Check if port 25 is listening:
+netstat -tulpn | grep :25
+
+Check firewall:
+firewall-cmd --list-services
+iptables -L | grep smtp
+
+Check MX records:
+dig MX yourdomain.com
+
+Solution:
+# Ensure postfix listening on all interfaces
+vi /etc/postfix/main.cf
+inet_interfaces = all
+postfix reload
+
+# Open firewall
+firewall-cmd --permanent --add-service=smtp
+firewall-cmd --reload
+
+Problem 7: "Connection timed out" errors
+
+Cause: Network/firewall blocking
+
+Debugging:
+# Test from server
+telnet recipient-server.com 25
+
+# Test from outside
+# (from another server)
+telnet your-mail-server.com 25
+
+# Check if ISP blocks port 25
+curl -v telnet://gmail-smtp-in.l.google.com:25
+
+Solution:
+- Contact hosting provider to unblock port 25
+- Use alternate port (587) with STARTTLS
+- Use relay service (like Gmail, SendGrid)
+
+---
+
+## 9. Best Practices
+
+### Security Best Practices
+
+1. Disable unnecessary services:
+postconf -e "smtpd_recipient_restrictions = permit_mynetworks, reject_unauth_destination"
+
+2. Implement rate limiting:
+smtpd_client_connection_count_limit = 10
+smtpd_client_connection_rate_limit = 30
+smtpd_client_message_rate_limit = 100
+
+3. Use TLS encryption:
+smtpd_tls_security_level = may
+smtp_tls_security_level = may
+
+4. Implement authentication:
+smtpd_sasl_auth_enable = yes
+smtpd_sasl_security_options = noanonymous
+
+5. Regular updates:
+yum update postfix
+yum update sendmail
+
+6. Monitor logs:
+tail -f /var/log/maillog
+
+7. Set up SPF, DKIM, DMARC:
+SPF: v=spf1 mx ip4:YOUR.IP ~all
+DKIM: Use OpenDKIM
+DMARC: v=DMARC1; p=quarantine; rua=mailto:reports@example.com
+
+8. Implement fail2ban:
+yum install fail2ban
+systemctl enable fail2ban
+systemctl start fail2ban
+
+### Performance Best Practices
+
+1. Queue management:
+# Limit queue lifetime
+maximal_queue_lifetime = 5d
+bounce_queue_lifetime = 5d
+
+2. Connection limits:
+default_process_limit = 100
+smtpd_client_connection_count_limit = 50
+
+3. Message size limits:
+message_size_limit = 10485760  # 10MB
+
+4. Concurrent delivery:
+default_destination_concurrency_limit = 20
+
+5. Regular queue cleanup:
+# Add to crontab
+0 3 * * * postsuper -d ALL deferred
+
+### Monitoring Best Practices
+
+1. Regular log analysis:
+# Check daily
+grep "error\|warning\|reject" /var/log/maillog | tail -50
+
+2. Queue monitoring:
+# Add to monitoring script
+QUEUE_COUNT=$(postqueue -p | tail -1 | awk '{print $5}')
+if [ $QUEUE_COUNT -gt 100 ]; then
+  echo "High queue count!" | mail -s "Alert" admin@example.com
+fi
+
+3. Disk space monitoring:
+# Check mail spool
+df -h /var/spool/postfix
+
+4. Service monitoring:
+# Check if running
+systemctl is-active postfix || echo "Postfix down!"
+
+### Backup Best Practices
+
+1. Regular config backups:
+# Daily backup
+cp -r /etc/postfix /backup/postfix-$(date +%Y%m%d)
+
+2. Queue backups (before maintenance):
+tar -czf /backup/postfix-queue-$(date +%Y%m%d).tar.gz /var/spool/postfix
+
+3. Alias backups:
+cp /etc/aliases /backup/aliases-$(date +%Y%m%d)
+
+---
+
+## 10. Quick Reference Cheat Sheet
+
+### Postfix Quick Commands
+
+# Service management
+systemctl start|stop|restart|reload|status postfix
+
+# Configuration
+postconf                       # Show all settings
+postconf -n                    # Show non-default settings
+postconf -e 'parameter=value'  # Set parameter
+postfix check                  # Check syntax
+postfix reload                 # Reload config
+
+# Queue management
+mailq                          # View queue
+postqueue -p                   # View queue (detailed)
+postqueue -f                   # Flush queue (retry)
+postsuper -d QUEUE_ID          # Delete message
+postsuper -d ALL              # Delete all
+postsuper -d ALL deferred      # Delete deferred
+
+# Logging
+tail -f /var/log/maillog      # Monitor logs
+grep QUEUE_ID /var/log/maillog # Track specific message
+
+# Testing
+telnet localhost 25            # Test SMTP
+echo "Test" | mail -s "Test" user@example.com
+
+### Sendmail Quick Commands
+
+# Service management
+systemctl start|stop|restart|status sendmail
+
+# Configuration
+vi /etc/mail/sendmail.mc       # Edit config
+m4 /etc/mail/sendmail.mc > /etc/mail/sendmail.cf  # Compile
+
+# Queue management
+mailq                          # View queue
+sendmail -bp                   # View queue
+sendmail -q                    # Process queue
+sendmail -v -q                 # Process verbose
+
+# Aliases
+vi /etc/aliases                # Edit aliases
+newaliases                     # Rebuild database
+
+# Logging
+tail -f /var/log/maillog       # Monitor logs
+
+### Mail Command Examples
+
+# Send simple email
+echo "Body" | mail -s "Subject" user@example.com
+
+# Send with attachment
+echo "See attached" | mail -s "Report" -a file.pdf user@example.com
+
+# Send to multiple recipients
+echo "Message" | mail -s "Subject" user1@example.com,user2@example.com
+
+# Send with CC
+echo "Message" | mail -s "Subject" -c cc@example.com user@example.com
+
+# Read local mail
+mail
+
+---
+
+## 11. Comparison Summary
+
+Choose Postfix if:
+✅ Starting fresh installation
+✅ Security is priority
+✅ Want easy configuration
+✅ Need modern features
+✅ Performance matters
+✅ Want active community support
+
+Choose Sendmail if:
+✅ Already installed and configured
+✅ Have expert Sendmail admins
+✅ Need extremely complex routing
+✅ Organization policy requires it
+✅ Legacy system integration
+
+For 95% of use cases: **Use Postfix**
+
+---
+
+## 12. Conclusion
+
+### Key Takeaways
+
+1. **MTAs are essential** for server email functionality
+2. **Postfix is recommended** for new installations
+3. **Configuration matters** - secure your mail server
+4. **Monitoring is critical** - watch logs and queues
+5. **Testing is important** - verify delivery works
+6. **Security first** - SPF, DKIM, DMARC, TLS
+7. **Backup configs** - before making changes
+8. **Use scripts** - automate notifications
+9. **Check logs** - /var/log/maillog is your friend
+10. **Keep updated** - patch security vulnerabilities
+
+### Final Recommendations
+
+**For Small Servers (1-100 emails/day):**
+- Use Gmail relay
+- Simple Postfix configuration
+- Basic monitoring
+
+**For Medium Servers (100-10,000 emails/day):**
+- Full Postfix installation
+- Implement security (SPF, DKIM)
+- Active monitoring
+- Regular maintenance
+
+**For Large Servers (10,000+ emails/day):**
+- Dedicated mail servers
+- Load balancing
+- Advanced security
+- Professional monitoring
+- Disaster recovery plan
+- Dedicated mail admin
+
+### Resources
+
+- Postfix Documentation: http://www.postfix.org/documentation.html
+- Sendmail Documentation: https://www.sendmail.org/
+- Email Testing Tools:
+- MXToolbox: https://mxtoolbox.com/
+- Mail-tester: https://www.mail-tester.com/
+- DKIM Validator: https://dkimvalidator.com/
+
+---
+
+## Author Information
+Content based on training materials
+For educational purposes
+
+Remember: Always test in development before production!
