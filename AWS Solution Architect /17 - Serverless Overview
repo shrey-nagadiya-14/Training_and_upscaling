@@ -1,1 +1,3164 @@
+# AWS SERVERLESS - COMPLETE GUIDE (PART 1)
+## Lambda, Edge Computing, and CloudFront Functions
 
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Serverless Overview
+2. What's Serverless?
+3. Serverless in AWS
+4. Why AWS Lambda
+5. Benefits of AWS Lambda
+6. AWS Lambda Language Support
+7. AWS Lambda Integrations - Main Ones
+8. Example: Serverless Thumbnail Creation
+9. Example: Serverless CRON Job
+10. AWS Lambda Pricing
+11. AWS Lambda Limits to Know - Per Region
+12. Lambda Concurrency and Throttling
+13. Lambda Concurrency Issue
+14. Concurrency and Asynchronous Invocations
+15. Cold Starts & Provisioned Concurrency
+16. Reserved and Provisioned Concurrency
+17. Lambda SnapStart
+18. Customization At The Edge
+19. CloudFront Functions & Lambda@Edge Use Cases
+20. CloudFront Functions
+21. Lambda@Edge
+22. CloudFront Functions vs. Lambda@Edge
+23. CloudFront Functions vs. Lambda@Edge - Use Cases
+24. Lambda by Default
+25. Lambda in VPC
+26. Lambda with RDS Proxy
+27. Invoking Lambda from RDS & Aurora
+28. RDS Event Notifications
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 1. SERVERLESS OVERVIEW
+
+### Concept:
+Serverless is a cloud computing execution model where the cloud provider 
+dynamically manages the allocation and provisioning of servers.
+
+### What Does "Serverless" Really Mean?
+
+SERVERLESS ≠ No Servers
+SERVERLESS = You don't manage/provision/see the servers!
+
+Think of it like this:
+- Electricity: You don't own the power plant, you just use power
+- Serverless: You don't own/manage servers, you just run code
+
+### The Evolution:
+
+```
+TRADITIONAL:
+Physical Servers → You manage everything
+
+VIRTUAL MACHINES (EC2):
+Virtual Servers → You manage the VM
+
+CONTAINERS (ECS/EKS):
+Containers → You manage containers
+
+SERVERLESS (Lambda):
+Functions → You manage NOTHING but code!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 2. WHAT'S SERVERLESS?
+
+### Definition:
+Serverless is a NEW PARADIGM in which developers don't have to manage 
+servers anymore... They just deploy code... They just deploy FUNCTIONS!
+
+### Key Points:
+
+✓ Developers don't manage servers anymore
+✓ Just deploy CODE
+✓ Just deploy FUNCTIONS!
+✓ Initially... Serverless == FaaS (Function as a Service)
+✓ Pioneered by AWS Lambda
+✓ Now includes anything that's MANAGED:
+  - Databases
+  - Messaging
+  - Storage
+  - etc.
+
+### Important Clarification:
+
+```
+SERVERLESS DOES NOT MEAN THERE ARE NO SERVERS!
+
+It means:
+✗ You don't MANAGE servers
+✗ You don't PROVISION servers
+✗ You don't SEE servers
+
+The servers exist, but AWS handles everything!
+```
+
+### Real-Life Analogy:
+
+TAXI vs UBER:
+- Taxi: You need to know routes, manage car, pay for gas
+- Uber: You just say destination, everything is handled
+
+TRADITIONAL vs SERVERLESS:
+- Traditional: Manage servers, OS, scaling, patching
+- Serverless: Just write code, everything is handled
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 3. SERVERLESS IN AWS
+
+### AWS Serverless Services:
+
+CORE SERVERLESS SERVICES:
+✓ AWS Lambda - Compute
+✓ DynamoDB - NoSQL Database
+✓ AWS Cognito - User Authentication
+✓ AWS API Gateway - REST APIs
+✓ Amazon S3 - Object Storage
+✓ AWS SNS & SQS - Messaging
+✓ AWS Kinesis Data Firehose - Data Streaming
+✓ Aurora Serverless - Relational Database
+✓ Step Functions - Workflow Orchestration
+✓ Fargate - Serverless Containers
+
+### Typical Serverless Architecture:
+
+```
+                              Users
+                                │
+              ┌─────────────────┼─────────────────┐
+              │                 │                 │
+         Static content      REST API          Log in
+              │                 │                 │
+              ▼                 ▼                 ▼
+        ┌─────────┐      ┌───────────┐     ┌──────────┐
+        │   S3    │      │    API    │     │ Cognito  │
+        │ bucket  │      │  Gateway  │     │          │
+        └─────────┘      └─────┬─────┘     └──────────┘
+                               │
+                               ▼
+                        ┌───────────┐
+                        │  Lambda   │
+                        └─────┬─────┘
+                              │
+                              ▼
+                        ┌───────────┐
+                        │ DynamoDB  │
+                        └───────────┘
+```
+
+### Why This Architecture?
+
+✓ S3: Serves static content (HTML, CSS, JS, images)
+✓ API Gateway: Exposes REST API endpoints
+✓ Cognito: Handles user authentication
+✓ Lambda: Runs business logic
+✓ DynamoDB: Stores data
+
+ALL FULLY MANAGED - NO SERVERS TO MANAGE!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 4. WHY AWS LAMBDA
+
+### Comparison: Amazon EC2 vs AWS Lambda
+
+### AMAZON EC2:
+
+```
+┌────────────────────────────────────────┐
+│            Amazon EC2                   │
+│                                         │
+│  • Virtual Servers in the Cloud        │
+│  • Limited by RAM and CPU              │
+│  • Continuously running                │
+│  • Scaling means intervention to       │
+│    add / remove servers                │
+│                                         │
+└────────────────────────────────────────┘
+```
+
+CHARACTERISTICS:
+- Virtual Servers in the Cloud
+- Limited by RAM and CPU
+- Continuously running (even when idle!)
+- Scaling = Manual intervention to add/remove servers
+
+### AMAZON LAMBDA:
+
+```
+┌────────────────────────────────────────┐
+│            Amazon Lambda                │
+│                                         │
+│  • Virtual FUNCTIONS – no servers      │
+│    to manage!                          │
+│  • Limited by time - short executions  │
+│  • Run ON-DEMAND                       │
+│  • Scaling is AUTOMATED!               │
+│                                         │
+└────────────────────────────────────────┘
+```
+
+CHARACTERISTICS:
+- Virtual FUNCTIONS - no servers to manage!
+- Limited by time - SHORT EXECUTIONS
+- Run ON-DEMAND (only when triggered)
+- Scaling is AUTOMATED!
+
+### Key Differences:
+
+```
+FEATURE          EC2                    LAMBDA
+─────────────────────────────────────────────────────────
+Servers          You manage             No management
+Running          Always running         On-demand only
+Scaling          Manual/ASG             Automatic
+Billing          Per hour/second        Per invocation + duration
+Timeout          None                   15 minutes max
+Best for         Long-running apps      Event-driven, short tasks
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 5. BENEFITS OF AWS LAMBDA
+
+### Benefit 1: EASY PRICING
+
+PAY PER REQUEST AND COMPUTE TIME:
+- Pay per REQUEST (number of invocations)
+- Pay per COMPUTE TIME (duration of execution)
+
+FREE TIER:
+- 1,000,000 AWS Lambda requests FREE
+- 400,000 GB-seconds of compute time FREE
+
+### Benefit 2: INTEGRATION
+
+INTEGRATED WITH THE WHOLE AWS SUITE:
+- API Gateway
+- DynamoDB
+- S3
+- CloudWatch
+- SNS, SQS
+- Kinesis
+- And many more!
+
+### Benefit 3: LANGUAGE SUPPORT
+
+INTEGRATED WITH MANY PROGRAMMING LANGUAGES:
+- Node.js (JavaScript)
+- Python
+- Java
+- C# (.NET Core)
+- Ruby
+- Custom Runtime API (Rust, Golang, etc.)
+
+### Benefit 4: MONITORING
+
+EASY MONITORING THROUGH AWS CLOUDWATCH:
+- Logs automatically sent to CloudWatch
+- Metrics available out of the box
+- X-Ray integration for tracing
+
+### Benefit 5: RESOURCES
+
+EASY TO GET MORE RESOURCES PER FUNCTION:
+- Up to 10GB of RAM!
+- Increasing RAM will also improve CPU and network!
+
+### Summary of Benefits:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                  AWS LAMBDA BENEFITS                      │
+├──────────────────────────────────────────────────────────┤
+│  ✓ Pay per request and compute time                      │
+│  ✓ Free tier: 1M requests, 400K GB-seconds               │
+│  ✓ Integrated with whole AWS suite                       │
+│  ✓ Integrated with many programming languages            │
+│  ✓ Easy monitoring through CloudWatch                    │
+│  ✓ Easy to get more resources (up to 10GB RAM!)          │
+│  ✓ Increasing RAM improves CPU and network!              │
+└──────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 6. AWS LAMBDA LANGUAGE SUPPORT
+
+### Natively Supported Languages:
+
+✓ Node.js (JavaScript)
+✓ Python
+✓ Java
+✓ C# (.NET Core) / PowerShell
+✓ Ruby
+✓ Custom Runtime API (community supported, e.g., Rust or Golang)
+
+### Lambda Container Image:
+
+CONTAINER IMAGE SUPPORT:
+- The container image must implement the Lambda Runtime API
+- ECS / Fargate is preferred for running arbitrary Docker images
+
+```
+WHEN TO USE CONTAINER IMAGES IN LAMBDA:
+✓ Need specific dependencies
+✓ Have existing Docker workflow
+✓ Want consistent dev/prod environment
+
+WHEN TO USE ECS/FARGATE INSTEAD:
+✓ Running arbitrary Docker images
+✓ Need more control over container
+✓ Long-running processes
+```
+
+### Language Comparison:
+
+```
+LANGUAGE        COLD START    BEST FOR
+────────────────────────────────────────────────────
+Python          Fast          Scripts, ML, data processing
+Node.js         Fast          APIs, web backends
+Java            Slow          Enterprise apps, existing Java code
+C#/.NET         Medium        .NET ecosystem, Windows background
+Ruby            Fast          Ruby applications
+Go (Custom)     Very Fast     High-performance, concurrent apps
+Rust (Custom)   Very Fast     System-level, high-performance
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 7. AWS LAMBDA INTEGRATIONS - MAIN ONES
+
+### Main AWS Services That Integrate with Lambda:
+
+```
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ API Gateway │  │   Kinesis   │  │  DynamoDB   │  │     S3      │  │ CloudFront  │
+└─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘
+
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│ CloudWatch  │  │ CloudWatch  │  │     SNS     │  │     SQS     │  │   Cognito   │
+│   Events    │  │    Logs     │  │             │  │             │  │             │
+│ EventBridge │  │             │  │             │  │             │  │             │
+└─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘
+```
+
+### Integration Details:
+
+1. API GATEWAY
+   - Invoke Lambda for REST API requests
+   - Create serverless APIs
+
+2. KINESIS
+   - Process streaming data
+   - Real-time analytics
+
+3. DYNAMODB
+   - DynamoDB Streams trigger Lambda
+   - React to data changes
+
+4. S3
+   - Trigger on object upload/delete
+   - Process files
+
+5. CLOUDFRONT (Lambda@Edge)
+   - Run Lambda at edge locations
+   - Customize CDN behavior
+
+6. CLOUDWATCH EVENTS / EVENTBRIDGE
+   - Schedule Lambda (cron jobs)
+   - React to AWS events
+
+7. CLOUDWATCH LOGS
+   - Process log streams
+   - Real-time log analysis
+
+8. SNS
+   - Trigger from notifications
+   - Fan-out pattern
+
+9. SQS
+   - Process queue messages
+   - Decouple applications
+
+10. COGNITO
+    - Custom authentication flows
+    - User triggers
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 8. EXAMPLE: SERVERLESS THUMBNAIL CREATION
+
+### Use Case:
+Automatically create thumbnails when images are uploaded to S3.
+
+### Architecture:
+
+```
+                                        push
+                              ┌────────────────────→ S3 Bucket
+                              │                      (Thumbnail)
+                              │
+┌──────────┐   trigger   ┌────┴────┐   push    ┌──────────────┐
+│ S3 Bucket│────────────→│  AWS    │─────────→ │  DynamoDB    │
+│  (Input  │             │ Lambda  │           │  (Metadata)  │
+│  Image)  │             │Function │           │              │
+└──────────┘             └─────────┘           │ - Image name │
+                         Creates a              │ - Image size │
+New image               Thumbnail              │ - Creation   │
+ in S3                                         │   date       │
+                                               │ - etc...     │
+                                               └──────────────┘
+```
+
+### How It Works:
+
+1. USER UPLOADS IMAGE
+   - Image uploaded to S3 input bucket
+
+2. S3 TRIGGERS LAMBDA
+   - S3 event notification triggers Lambda function
+
+3. LAMBDA PROCESSES
+   - Downloads original image
+   - Creates thumbnail
+   - Uploads thumbnail to output bucket
+   - Stores metadata in DynamoDB
+
+4. RESULT
+   - Thumbnail available in S3
+   - Metadata stored in DynamoDB
+
+### Benefits:
+
+✓ No servers to manage
+✓ Scales automatically (1 image or 1 million)
+✓ Pay only when processing images
+✓ Fully automated pipeline
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 9. EXAMPLE: SERVERLESS CRON JOB
+
+### Use Case:
+Run scheduled tasks (like cron jobs) without managing servers.
+
+### Architecture:
+
+```
+┌──────────────────────┐        Trigger        ┌──────────────────────┐
+│   CloudWatch Events  │───────────────────────│    AWS Lambda        │
+│     EventBridge      │     Every 1 hour      │      Function        │
+│                      │                       │                      │
+│  [Schedule Rule]     │──────────────────────→│   Perform a task     │
+└──────────────────────┘                       └──────────────────────┘
+```
+
+### How It Works:
+
+1. CREATE EVENTBRIDGE RULE
+   - Define schedule (cron expression or rate)
+   - Example: "Every 1 hour"
+
+2. RULE TRIGGERS LAMBDA
+   - At scheduled time, EventBridge invokes Lambda
+
+3. LAMBDA EXECUTES
+   - Performs the scheduled task
+   - Logs to CloudWatch
+
+### Schedule Examples:
+
+```
+RATE EXPRESSIONS:
+rate(1 minute)      - Every minute
+rate(1 hour)        - Every hour
+rate(1 day)         - Every day
+
+CRON EXPRESSIONS:
+cron(0 12 * * ? *)  - Every day at 12:00 PM UTC
+cron(0 8 ? * MON *)  - Every Monday at 8:00 AM UTC
+cron(0 0 1 * ? *)   - First day of every month at midnight
+```
+
+### Use Cases:
+
+✓ Daily reports generation
+✓ Database cleanup
+✓ Scheduled data sync
+✓ Periodic health checks
+✓ Automated backups
+✓ Any scheduled task!
+
+### Benefits vs Traditional Cron:
+
+```
+TRADITIONAL CRON:
+- Need a server running 24/7
+- Pay for server even when idle
+- Manage server, OS, updates
+
+SERVERLESS CRON:
+- No server needed
+- Pay only for execution time
+- Fully managed
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 10. AWS LAMBDA PRICING
+
+### Pricing Overview:
+
+Find overall pricing information at:
+https://aws.amazon.com/lambda/pricing/
+
+### Pay Per Calls:
+
+```
+PAY PER CALLS:
+─────────────────────────────────────────────────
+First 1,000,000 requests are FREE!
+$0.20 per 1 million requests thereafter
+($0.0000002 per request)
+
+EXAMPLE:
+- 5 million requests/month
+- First 1M = FREE
+- Remaining 4M = 4 × $0.20 = $0.80
+```
+
+### Pay Per Duration:
+
+```
+PAY PER DURATION: (in increment of 1 ms)
+─────────────────────────────────────────────────
+400,000 GB-seconds of compute time per month for FREE!
+  == 400,000 seconds if function is 1GB RAM
+  == 3,200,000 seconds if function is 128 MB RAM
+
+After that: $1.00 for 600,000 GB-seconds
+```
+
+### GB-Second Calculation:
+
+```
+FORMULA:
+GB-seconds = (Memory in GB) × (Duration in seconds)
+
+EXAMPLE 1:
+- Function: 1 GB RAM
+- Duration: 1 second
+- GB-seconds: 1 × 1 = 1 GB-second
+
+EXAMPLE 2:
+- Function: 128 MB (0.125 GB) RAM
+- Duration: 1 second
+- GB-seconds: 0.125 × 1 = 0.125 GB-second
+```
+
+### Why Lambda is Cost-Effective:
+
+```
+IT IS USUALLY VERY CHEAP TO RUN AWS LAMBDA
+THAT'S WHY IT'S VERY POPULAR!
+
+EXAMPLE MONTHLY COST:
+- 10 million requests
+- 3 seconds average duration
+- 512 MB memory
+
+Requests: (10M - 1M free) × $0.20/M = $1.80
+Duration: 10M × 3s × 0.5GB = 15M GB-s
+          (15M - 400K free) × $0.0000166 = $242.31
+
+Total: ~$244/month for 10 MILLION function executions!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 11. AWS LAMBDA LIMITS TO KNOW - PER REGION
+
+### Execution Limits:
+
+```
+EXECUTION:
+─────────────────────────────────────────────────
+Memory allocation:        128 MB – 10GB (1 MB increments)
+Maximum execution time:   900 seconds (15 minutes)
+Environment variables:    4 KB
+Disk capacity (/tmp):     512 MB to 10GB
+Concurrency executions:   1000 (can be increased)
+```
+
+### Deployment Limits:
+
+```
+DEPLOYMENT:
+─────────────────────────────────────────────────
+Deployment size (compressed .zip):     50 MB
+Size of uncompressed deployment 
+(code + dependencies):                 250 MB
+Can use /tmp directory to load 
+other files at startup
+Size of environment variables:         4 KB
+```
+
+### Understanding the Limits:
+
+```
+MEMORY (128 MB - 10GB):
+- More memory = More CPU = Better performance
+- Choose based on workload needs
+
+EXECUTION TIME (15 minutes max):
+- Lambda is for SHORT tasks
+- For longer tasks, use AWS Batch or Step Functions
+
+DISK SPACE (/tmp: 512 MB - 10GB):
+- Temporary storage during execution
+- Cleared between invocations
+
+CONCURRENCY (1000 default):
+- 1000 simultaneous executions per region
+- Can request increase
+```
+
+### Important Notes:
+
+✓ /tmp directory can be used to load additional files at startup
+✓ Environment variables are limited to 4 KB total
+✓ Deployment package includes your code AND all dependencies
+✓ For larger packages, consider Lambda Layers or container images
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 12. LAMBDA CONCURRENCY AND THROTTLING
+
+### Concurrency Concept:
+
+```
+CONCURRENCY LIMIT: Up to 1000 concurrent executions
+─────────────────────────────────────────────────
+
+       Request 1 ──→ [λ]     [λ][λ][λ][λ][λ][λ]
+       Request 2 ──→ [λ] ──→ [λ][λ][λ][λ][λ][λ]
+                              [λ][λ][λ][λ][λ][λ]
+                              [λ][λ][λ][λ][λ][λ]
+                              
+                              Up to 1000 concurrent!
+```
+
+### Reserved Concurrency:
+
+CAN SET "RESERVED CONCURRENCY" AT THE FUNCTION LEVEL (= limit)
+
+```
+RESERVED CONCURRENCY:
+- Sets a LIMIT for a specific function
+- Guarantees capacity for that function
+- Prevents one function from consuming all concurrency
+```
+
+### Throttling Behavior:
+
+EACH INVOCATION OVER THE CONCURRENCY LIMIT WILL TRIGGER A "THROTTLE"
+
+```
+SYNCHRONOUS INVOCATION:
+- Returns ThrottleError - 429
+
+ASYNCHRONOUS INVOCATION:
+- Retry automatically
+- Then go to Dead Letter Queue (DLQ)
+```
+
+### Getting Higher Limits:
+
+IF YOU NEED A HIGHER LIMIT, OPEN A SUPPORT TICKET!
+
+```
+DEFAULT: 1000 concurrent executions
+MAXIMUM: Can be increased to tens of thousands
+HOW: Open AWS Support ticket
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 13. LAMBDA CONCURRENCY ISSUE
+
+### The Problem:
+
+IF YOU DON'T RESERVE (=LIMIT) CONCURRENCY, THE FOLLOWING CAN HAPPEN:
+
+```
+                                              1000 concurrent
+                                              executions (limit)
+Many users ──→ [Application    ──→ [λ][λ][λ][λ][λ][λ]
+               Load Balancer]      [λ][λ][λ][λ][λ][λ]
+                                   [λ][λ][λ][λ][λ][λ]
+                                   [λ][λ][λ][λ][λ][λ]
+                                   (Uses all 1000!)
+
+Few users ───→ [API Gateway] ──→ [λ] THROTTLE!
+                                  ↑
+                                  No capacity left!
+
+SDK / CLI ──────────────────────→ [λ] THROTTLE!
+                                  ↑
+                                  No capacity left!
+```
+
+### The Scenario:
+
+1. Application through ALB gets massive traffic
+2. Uses all 1000 concurrent executions
+3. Other functions (API Gateway, SDK) get THROTTLED
+4. Those functions fail with 429 errors
+
+### The Solution: Reserved Concurrency
+
+```
+USE RESERVED CONCURRENCY:
+
+Function A (ALB):       Reserved = 700
+Function B (API GW):    Reserved = 200
+Function C (SDK):       Reserved = 100
+                        ─────────────────
+                        Total = 1000
+
+Now each function has GUARANTEED capacity!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 14. CONCURRENCY AND ASYNCHRONOUS INVOCATIONS
+
+### Asynchronous Invocation Behavior:
+
+```
+                    ┌──────────┐
+   New file event ──┤          ├──→ [λ]
+                    │          │
+   New file event ──┤ S3 Bucket├──→ [λ]
+                    │          │
+   New file event ──┤          ├──→ [λ]
+                    └──────────┘
+```
+
+### What Happens When Throttled:
+
+IF THE FUNCTION DOESN'T HAVE ENOUGH CONCURRENCY AVAILABLE TO PROCESS 
+ALL EVENTS, ADDITIONAL REQUESTS ARE THROTTLED.
+
+### Retry Behavior:
+
+```
+FOR THROTTLING ERRORS (429) AND SYSTEM ERRORS (500-series):
+
+1. Lambda returns the event to the queue
+2. Attempts to run the function again
+3. Retries for up to 6 HOURS!
+4. The retry interval increases EXPONENTIALLY:
+   - First retry: 1 second
+   - Then increases up to maximum of 5 minutes
+```
+
+### Retry Timeline:
+
+```
+RETRY TIMELINE:
+─────────────────────────────────────────────────
+Initial attempt    ──→ FAIL (throttled)
+After 1 second     ──→ Retry 1
+After 2 seconds    ──→ Retry 2
+After 4 seconds    ──→ Retry 3
+...
+After 5 minutes    ──→ Retry N (max interval)
+...
+After 6 HOURS      ──→ Give up, send to DLQ
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 15. COLD STARTS & PROVISIONED CONCURRENCY
+
+### Cold Start:
+
+WHAT IS A COLD START?
+
+```
+COLD START:
+- New instance => Code is loaded and code outside the handler runs (init)
+- If the init is large (code, dependencies, SDK...) this process 
+  can take some time
+- First request served by new instances has HIGHER LATENCY than the rest
+```
+
+### Cold Start Explained:
+
+```
+COLD START FLOW:
+                    ┌─────────────────────────────────────┐
+   Request ──→      │  1. Download code                   │
+                    │  2. Start new execution environment │
+                    │  3. Run initialization code         │  ← COLD START
+                    │  4. Execute handler                 │     (slow!)
+                    └─────────────────────────────────────┘
+
+WARM START FLOW:
+                    ┌─────────────────────────────────────┐
+   Request ──→      │  4. Execute handler                 │  ← WARM START
+                    └─────────────────────────────────────┘     (fast!)
+```
+
+### Provisioned Concurrency:
+
+PROVISIONED CONCURRENCY:
+- Concurrency is allocated BEFORE the function is invoked (in advance)
+- So the cold start NEVER HAPPENS and all invocations have LOW LATENCY
+- Application Auto Scaling can manage concurrency (schedule or target utilization)
+
+```
+WITH PROVISIONED CONCURRENCY:
+- Pre-initialized execution environments
+- Ready to respond immediately
+- No cold start latency
+- Pay for provisioned capacity (even when idle)
+```
+
+### Note on VPC Cold Starts:
+
+```
+NOTE: Cold starts in VPC have been dramatically reduced 
+in Oct & Nov 2019
+
+Reference:
+https://aws.amazon.com/blogs/compute/announcing-improved-vpc-networking-for-aws-lambda-functions/
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 16. RESERVED AND PROVISIONED CONCURRENCY
+
+### Visual Comparison:
+
+```
+RESERVED CONCURRENCY ONLY:
+───────────────────────────────────────────────────────
+                ┌─────────────────────────────────────┐
+                │        Other functions              │
+                ├─────────────────────────────────────┤
+                │        my-function-DEV              │ ← Unreserved
+                │        (unreserved)                 │    concurrency
+                ├─────────────────────────────────────┤
+                │        my-function-PROD             │ ← Reserved
+                │        (reserved)                   │    concurrency
+                │                                     │    (guaranteed)
+                └─────────────────────────────────────┘
+
+
+PROVISIONED CONCURRENCY WITH RESERVED CONCURRENCY:
+───────────────────────────────────────────────────────
+                ┌─────────────────────────────────────┐
+                │        Other functions              │
+                ├─────────────────────────────────────┤
+                │        my-function-DEV              │ ← Unreserved
+                ├─────────────────────────────────────┤
+                │   PROVISIONED CONCURRENCY           │ ← Pre-warmed!
+                │        my-function-PROD             │    No cold starts!
+                │        (reserved + provisioned)     │
+                └─────────────────────────────────────┘
+```
+
+### Key Differences:
+
+```
+RESERVED CONCURRENCY:
+─────────────────────────────────────────────────
+✓ Limits max concurrent executions
+✓ Guarantees capacity for the function
+✓ Does NOT eliminate cold starts
+✓ No additional cost
+
+PROVISIONED CONCURRENCY:
+─────────────────────────────────────────────────
+✓ Pre-initializes execution environments
+✓ Eliminates cold starts
+✓ Additional cost (pay for idle capacity)
+✓ Best for latency-sensitive applications
+```
+
+### Reference:
+https://docs.aws.amazon.com/lambda/latest/dg/configuration-concurrency.html
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 17. LAMBDA SNAPSTART
+
+### Concept:
+
+LAMBDA SNAPSTART:
+- Improves your Lambda functions performance up to 10x at NO EXTRA COST
+- Available for Java, Python & .NET
+
+### How It Works:
+
+```
+SnapStart ENABLED:                    SnapStart DISABLED:
+─────────────────────                 ─────────────────────
+
+    invoke                                invoke
+       │                                     │
+       ▼                                     ▼
+   ┌───────┐                             ┌───────┐
+   │Lambda │                             │Lambda │
+   │       │                             │       │
+   │  ✓    │ function is                 │       │
+   └───┬───┘ pre-initialized             └───┬───┘
+       │                                     │
+       ▼                                     ▼
+   ┌───────┐                             ┌───────┐
+   │Invoke │                             │ Init  │ ← Cold start!
+   └───┬───┘                             └───┬───┘
+       │                                     │
+       ▼                                     ▼
+   ┌───────┐                             ┌───────┐
+   │Shutdown│                            │Invoke │
+   └───────┘                             └───┬───┘
+                                             │
+                                             ▼
+                                         ┌───────┐
+                                         │Shutdown│
+                                         └───────┘
+```
+
+### Key Points:
+
+WHEN ENABLED:
+- Function is invoked from a PRE-INITIALIZED state
+- No function initialization from scratch!
+
+WHEN YOU PUBLISH A NEW VERSION:
+1. Lambda initializes your function
+2. Takes a SNAPSHOT of memory and disk state
+3. Snapshot is CACHED for low-latency access
+
+### Lambda Invocation Lifecycle Phases:
+
+```
+WITHOUT SNAPSTART:
+Init → Invoke → Shutdown
+
+WITH SNAPSTART:
+(Init already done via snapshot)
+Invoke → Shutdown
+```
+
+### Benefits:
+
+✓ Up to 10x faster cold starts
+✓ No extra cost!
+✓ Works with Java, Python, .NET
+✓ Reduces initialization time
+✓ Better user experience
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 18. CUSTOMIZATION AT THE EDGE
+
+### Concept:
+
+Many modern applications execute some form of the logic AT THE EDGE
+(close to users).
+
+### Edge Function:
+
+WHAT IS AN EDGE FUNCTION?
+- Code that you write and attach to CloudFront distributions
+- Runs CLOSE to your users to minimize latency
+
+### CloudFront Provides Two Types:
+
+1. CLOUDFRONT FUNCTIONS
+2. LAMBDA@EDGE
+
+```
+                        CloudFront
+                    Edge Locations
+                         │
+    Users ────────────────────────────→ Origin
+    (worldwide)          │               (your server)
+                         │
+                    [Edge Function]
+                    Runs here!
+                    Close to users!
+```
+
+### Benefits:
+
+✓ You don't have to manage any servers, deployed globally
+✓ Use case: customize the CDN content
+✓ Pay only for what you use
+✓ Fully serverless
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 19. CLOUDFRONT FUNCTIONS & LAMBDA@EDGE USE CASES
+
+### Common Use Cases:
+
+```
+USE CASES FOR EDGE FUNCTIONS:
+─────────────────────────────────────────────────
+✓ Website Security and Privacy
+✓ Dynamic Web Application at the Edge
+✓ Search Engine Optimization (SEO)
+✓ Intelligently Route Across Origins and Data Centers
+✓ Bot Mitigation at the Edge
+✓ Real-time Image Transformation
+✓ A/B Testing
+✓ User Authentication and Authorization
+✓ User Prioritization
+✓ User Tracking and Analytics
+```
+
+### Detailed Use Cases:
+
+1. WEBSITE SECURITY
+   - Add security headers
+   - Validate tokens
+   - Block malicious requests
+
+2. SEO
+   - Redirect bots to pre-rendered pages
+   - Add canonical URLs
+
+3. ROUTING
+   - Route to different origins based on device
+   - Geographic routing
+
+4. IMAGE TRANSFORMATION
+   - Resize images on the fly
+   - Format conversion (WebP)
+
+5. A/B TESTING
+   - Route users to different versions
+   - Cookie-based experiments
+
+6. AUTHENTICATION
+   - Validate JWT tokens
+   - Check authorization
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 20. CLOUDFRONT FUNCTIONS
+
+### Characteristics:
+
+```
+CLOUDFRONT FUNCTIONS:
+─────────────────────────────────────────────────
+✓ Lightweight functions written in JavaScript
+✓ For high-scale, latency-sensitive CDN customizations
+✓ Sub-millisecond startup times
+✓ MILLIONS of requests/second
+✓ Native feature of CloudFront (manage code entirely within CloudFront)
+```
+
+### Request/Response Flow:
+
+```
+        Client
+           │
+           │
+    ┌──────┴──────┐
+    │   Viewer    │
+    │   Request   │◄──────────────────┐
+    └──────┬──────┘                   │
+           │                          │
+           │                    CloudFront
+           ▼                    Functions can
+    ┌─────────────┐             modify these!
+    │ CloudFront  │                   │
+    └──────┬──────┘                   │
+           │                          │
+    ┌──────┴──────┐                   │
+    │   Viewer    │◄──────────────────┘
+    │  Response   │
+    └──────┬──────┘
+           │
+           │
+    ┌──────┴──────┐     ┌──────────────┐
+    │   Origin    │     │   Origin     │
+    │   Request   │────→│              │
+    └─────────────┘     │   (Your      │
+                        │    Server)   │
+    ┌─────────────┐     │              │
+    │   Origin    │◄────│              │
+    │  Response   │     └──────────────┘
+    └─────────────┘
+```
+
+### CloudFront Functions Can Only Handle:
+
+✓ Viewer Request - after CloudFront receives a request from a viewer
+✓ Viewer Response - before CloudFront forwards the response to the viewer
+
+### Key Points:
+
+- Written in JavaScript ONLY
+- Very fast (sub-ms startup)
+- Very high scale (millions/second)
+- Managed within CloudFront console
+- Limited capabilities (no network access, no file system)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 21. LAMBDA@EDGE
+
+### Characteristics:
+
+```
+LAMBDA@EDGE:
+─────────────────────────────────────────────────
+✓ Lambda functions written in Node.js or Python
+✓ Scales to 1000s of requests/second
+✓ Author your functions in one AWS Region (us-east-1)
+✓ CloudFront replicates to its locations
+```
+
+### Request/Response Flow:
+
+```
+        Client
+           │
+    ┌──────┴──────┐
+    │   Viewer    │◄───────── Lambda@Edge
+    │   Request   │           can modify
+    └──────┬──────┘
+           │
+    ┌──────┴──────┐
+    │ CloudFront  │
+    └──────┬──────┘
+           │
+    ┌──────┴──────┐
+    │   Origin    │◄───────── Lambda@Edge
+    │   Request   │           can modify
+    └──────┬──────┘
+           │
+    ┌──────┴──────┐
+    │   Origin    │
+    │  (Server)   │
+    └──────┬──────┘
+           │
+    ┌──────┴──────┐
+    │   Origin    │◄───────── Lambda@Edge
+    │  Response   │           can modify
+    └──────┬──────┘
+           │
+    ┌──────┴──────┐
+    │   Viewer    │◄───────── Lambda@Edge
+    │  Response   │           can modify
+    └─────────────┘
+```
+
+### Lambda@Edge Can Handle ALL Four Events:
+
+1. Viewer Request - after CloudFront receives request from viewer
+2. Origin Request - before CloudFront forwards request to origin
+3. Origin Response - after CloudFront receives response from origin
+4. Viewer Response - before CloudFront forwards response to viewer
+
+### Key Points:
+
+- Node.js or Python
+- Authored in us-east-1, replicated globally
+- More powerful than CloudFront Functions
+- Can access network and file system
+- Higher latency than CloudFront Functions
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 22. CLOUDFRONT FUNCTIONS VS. LAMBDA@EDGE
+
+### Comparison Table:
+
+```
+┌─────────────────────────────┬────────────────────────┬─────────────────────────┐
+│         FEATURE             │  CLOUDFRONT FUNCTIONS  │      LAMBDA@EDGE        │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Runtime Support             │ JavaScript             │ Node.js, Python         │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ # of Requests               │ MILLIONS of requests   │ THOUSANDS of requests   │
+│                             │ per second             │ per second              │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ CloudFront Triggers         │ - Viewer Request       │ - Viewer Request        │
+│                             │ - Viewer Response      │ - Viewer Response       │
+│                             │                        │ - Origin Request        │
+│                             │                        │ - Origin Response       │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Max. Execution Time         │ < 1 ms                 │ 5 – 10 seconds          │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Max. Memory                 │ 2 MB                   │ 128 MB up to 10 GB      │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Total Package Size          │ 10 KB                  │ 1 MB – 50 MB            │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Network Access,             │ No                     │ Yes                     │
+│ File System Access          │                        │                         │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Access to Request Body      │ No                     │ Yes                     │
+├─────────────────────────────┼────────────────────────┼─────────────────────────┤
+│ Pricing                     │ Free tier available,   │ No free tier,           │
+│                             │ 1/6th price of @Edge   │ charged per request     │
+│                             │                        │ & duration              │
+└─────────────────────────────┴────────────────────────┴─────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 23. CLOUDFRONT FUNCTIONS VS. LAMBDA@EDGE - USE CASES
+
+### CloudFront Functions Use Cases:
+
+```
+CLOUDFRONT FUNCTIONS - USE CASES:
+─────────────────────────────────────────────────
+✓ Cache key normalization
+  - Transform request attributes (headers, cookies, query strings, URL)
+  - Create an optimal Cache Key
+
+✓ Header manipulation
+  - Insert/modify/delete HTTP headers in the request or response
+
+✓ URL rewrites or redirects
+
+✓ Request authentication & authorization
+  - Create and validate user-generated tokens (e.g., JWT)
+  - Allow/deny requests
+```
+
+### Lambda@Edge Use Cases:
+
+```
+LAMBDA@EDGE - USE CASES:
+─────────────────────────────────────────────────
+✓ Longer execution time (several ms)
+
+✓ Adjustable CPU or memory
+
+✓ Your code depends on 3rd party libraries
+  (e.g., AWS SDK to access other AWS services)
+
+✓ Network access to use external services for processing
+
+✓ File system access or access to the body of HTTP requests
+```
+
+### Decision Guide:
+
+```
+CHOOSE CLOUDFRONT FUNCTIONS WHEN:
+─────────────────────────────────────────────────
+✓ Simple transformations
+✓ Header/cookie manipulation
+✓ URL rewrites
+✓ Simple auth checks
+✓ Need millions of requests/second
+✓ Must be sub-millisecond
+
+CHOOSE LAMBDA@EDGE WHEN:
+─────────────────────────────────────────────────
+✓ Complex logic
+✓ Need external API calls
+✓ Need AWS SDK
+✓ Need file system access
+✓ Need request body access
+✓ Execution > 1ms is acceptable
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 24. LAMBDA BY DEFAULT
+
+### Default Lambda Deployment:
+
+BY DEFAULT, your Lambda function is launched OUTSIDE your own VPC
+(in an AWS-owned VPC).
+
+```
+DEFAULT LAMBDA DEPLOYMENT:
+─────────────────────────────────────────────────
+
+                        AWS Cloud
+                    ┌─────────────────────────────────┐
+                    │                                 │
+                    │    Public                       │
+Internet ───────────┤    www  ──────→ [Lambda]───────→ DynamoDB
+                    │    works                        │   (works!)
+                    │        │                        │
+                    │        │                        │
+                    │        ▼                        │
+                    │   VPC & Private Subnet          │
+                    │   ┌─────────────────────┐       │
+                    │   │                     │       │
+                    │   │   Private RDS  ✗    │       │
+                    │   │   Not working       │       │
+                    │   │                     │       │
+                    │   └─────────────────────┘       │
+                    │                                 │
+                    └─────────────────────────────────┘
+```
+
+### What This Means:
+
+THEREFORE, it CANNOT access resources in YOUR VPC:
+- RDS (in private subnet)
+- ElastiCache (in private subnet)
+- Internal ELB
+- Other VPC resources
+
+### What Works by Default:
+
+✓ DynamoDB (accessed via AWS public endpoints)
+✓ S3 (accessed via AWS public endpoints)
+✓ External APIs (accessed via internet)
+✓ Other AWS services with public endpoints
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 25. LAMBDA IN VPC
+
+### Deploying Lambda in a VPC:
+
+TO ACCESS VPC RESOURCES:
+- You must define the VPC ID
+- Define the Subnets
+- Define the Security Groups
+- Lambda will create an ENI (Elastic Network Interface) in your subnets
+
+```
+LAMBDA IN VPC:
+─────────────────────────────────────────────────
+
+                    Lambda Function
+                         │
+                         │
+            ┌────────────┴────────────┐
+            │                         │
+            │     Private subnet      │
+            │  ┌───────────────────┐  │
+            │  │ Lambda Security   │  │
+            │  │     Group         │  │
+            │  │ ┌───────────────┐ │  │
+            │  │ │    Elastic    │ │  │
+            │  │ │   Network     │ │  │
+            │  │ │   Interface   │ │  │
+            │  │ │    (ENI)      │ │  │
+            │  │ └───────┬───────┘ │  │
+            │  └─────────┼─────────┘  │
+            │            │            │
+            │  ┌─────────┴─────────┐  │
+            │  │ RDS Security      │  │
+            │  │     Group         │  │
+            │  │ ┌───────────────┐ │  │
+            │  │ │  Amazon RDS   │ │  │
+            │  │ │   In VPC      │ │  │
+            │  │ └───────────────┘ │  │
+            │  └───────────────────┘  │
+            │                         │
+            └─────────────────────────┘
+```
+
+### Configuration Required:
+
+1. VPC ID - Which VPC to deploy in
+2. Subnets - Which subnets (usually private)
+3. Security Groups - Network access rules
+
+### Lambda Creates ENI:
+
+- Lambda creates an ENI in your subnet
+- ENI belongs to Lambda's security group
+- ENI can communicate with other resources in VPC
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 26. LAMBDA WITH RDS PROXY
+
+### The Problem:
+
+IF LAMBDA FUNCTIONS DIRECTLY ACCESS YOUR DATABASE, THEY MAY OPEN 
+TOO MANY CONNECTIONS UNDER HIGH LOAD.
+
+```
+THE PROBLEM:
+─────────────────────────────────────────────────
+
+  [λ][λ][λ][λ][λ] ...  ──→  RDS DB Instance
+   │  │  │  │  │              │
+   └──┴──┴──┴──┴──────────────┘
+        Too many connections!
+        Database overwhelmed!
+```
+
+### The Solution: RDS Proxy
+
+```
+RDS PROXY BENEFITS:
+─────────────────────────────────────────────────
+✓ Improve scalability by POOLING and SHARING DB connections
+
+✓ Improve availability by reducing failover time by 66% 
+  and preserving connections
+
+✓ Improve security by enforcing IAM authentication and 
+  storing credentials in Secrets Manager
+```
+
+### Architecture with RDS Proxy:
+
+```
+LAMBDA WITH RDS PROXY:
+─────────────────────────────────────────────────
+
+                            VPC
+        ┌─────────────────────────────────────────┐
+        │     Lambda functions                     │
+        │     [λ][λ][λ][λ][λ] ...                 │
+        │          │                              │
+        │          │                              │
+        │          ▼                              │
+        │   ┌─────────────┐      Private subnet   │
+        │   │             │     ┌─────────────┐   │
+        │   │  RDS Proxy  │────→│  RDS DB     │   │
+        │   │             │     │  Instance   │   │
+        │   └─────────────┘     └─────────────┘   │
+        │                                         │
+        └─────────────────────────────────────────┘
+```
+
+### Important Note:
+
+THE LAMBDA FUNCTION MUST BE DEPLOYED IN YOUR VPC, 
+BECAUSE RDS PROXY IS NEVER PUBLICLY ACCESSIBLE!
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 27. INVOKING LAMBDA FROM RDS & AURORA
+
+### Concept:
+
+You can invoke Lambda functions from WITHIN your DB instance!
+
+```
+INVOKE LAMBDA FROM RDS/AURORA:
+─────────────────────────────────────────────────
+✓ Invoke Lambda functions from within your DB instance
+✓ Allows you to process DATA EVENTS from within a database
+✓ Supported for RDS for PostgreSQL and Aurora MySQL
+```
+
+### Example Flow:
+
+```
+                                         ┌──────────┐
+        User                             │          │
+          │                              │  RDS DB  │
+          │ register                     │ Instance │
+          │ (INSERT)                     │          │
+          ▼                              │ Permissions
+    ┌──────────┐                         │          │
+    │  RDS DB  │                         └────┬─────┘
+    │ Instance │──────── invoke ─────────────→│
+    └──────────┘                              │
+                                              ▼
+                                        ┌──────────┐
+                                        │  Lambda  │
+                                        │ function │
+                                        └────┬─────┘
+                                             │
+                                    send Email
+                                             │
+                                             ▼
+                                        ┌──────────┐
+                                        │ Amazon   │
+                                        │   SES    │
+                                        └──────────┘
+```
+
+### Requirements:
+
+```
+REQUIREMENTS:
+─────────────────────────────────────────────────
+✓ Must allow outbound traffic to your Lambda function
+  from within your DB instance
+  (Public, NAT GW, VPC Endpoints)
+
+✓ DB instance must have the required permissions
+  to invoke the Lambda function
+  (Lambda Resource-based Policy & IAM Policy)
+```
+
+### Use Cases:
+
+✓ Send welcome email when user registers
+✓ Trigger notifications on data changes
+✓ Process data in real-time
+✓ Integrate with external services
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 28. RDS EVENT NOTIFICATIONS
+
+### Concept:
+
+RDS Event Notifications are different from invoking Lambda from the database.
+These are notifications about the DB INSTANCE ITSELF.
+
+```
+RDS EVENT NOTIFICATIONS:
+─────────────────────────────────────────────────
+✓ Notifications that tell information about the 
+  DB INSTANCE ITSELF (created, stopped, start, ...)
+  
+✓ You DON'T have any information about the DATA itself
+
+✓ Subscribe to the following event categories:
+  - DB instance
+  - DB snapshot
+  - DB Parameter Group
+  - DB Security Group
+  - RDS Proxy
+  - Custom Engine Version
+
+✓ Near real-time events (up to 5 minutes)
+
+✓ Send notifications to SNS or subscribe to events 
+  using EventBridge
+```
+
+### Architecture:
+
+```
+RDS EVENT NOTIFICATIONS:
+─────────────────────────────────────────────────
+
+    ┌───────────┐
+    │  RDS DB   │
+    │ Instance  │
+    └─────┬─────┘
+          │
+          │ (events about the instance)
+          │
+          ├────────────→ SNS ────────→ SQS Queue
+          │                    └────→ Lambda function
+          │
+          └────────────→ EventBridge ────→ Lambda function
+```
+
+### Event Categories:
+
+```
+DB INSTANCE EVENTS:
+- creation, deletion
+- starting, stopping
+- failover
+- configuration change
+
+DB SNAPSHOT EVENTS:
+- snapshot creation
+- snapshot deletion
+- snapshot sharing
+
+DB PARAMETER GROUP EVENTS:
+- parameter changes
+
+DB SECURITY GROUP EVENTS:
+- security group changes
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                        END OF PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+PART 2 COVERS:
+- Amazon DynamoDB
+- DynamoDB Features (DAX, Streams, Global Tables, TTL, Backups)
+- AWS API Gateway
+- AWS Step Functions
+- Amazon Cognito
+
+═══════════════════════════════════════════════════════════════════════════════
+
+# AWS SERVERLESS - COMPLETE GUIDE (PART 2)
+## DynamoDB, API Gateway, Step Functions, and Cognito
+
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 2
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Amazon DynamoDB
+2. DynamoDB - Basics
+3. DynamoDB – Table Example
+4. DynamoDB – Read/Write Capacity Modes
+5. DynamoDB Accelerator (DAX)
+6. DynamoDB Accelerator (DAX) vs. ElastiCache
+7. DynamoDB – Stream Processing
+8. DynamoDB Streams
+9. DynamoDB Global Tables
+10. DynamoDB – Time To Live (TTL)
+11. DynamoDB – Backups for Disaster Recovery
+12. DynamoDB – Integration with Amazon S3
+13. AWS API Gateway
+14. API Gateway – Integrations High Level
+15. API Gateway – AWS Service Integration (Kinesis Example)
+16. API Gateway - Endpoint Types
+17. API Gateway – Security
+18. AWS Step Functions
+19. Amazon Cognito
+20. Cognito User Pools (CUP) – User Features
+21. Cognito User Pools (CUP) - Integrations
+22. Cognito Identity Pools (Federated Identities)
+23. Cognito Identity Pools – Diagram
+24. Cognito Identity Pools - Row Level Security in DynamoDB
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 1. AMAZON DYNAMODB
+
+### Overview:
+
+```
+AMAZON DYNAMODB:
+─────────────────────────────────────────────────
+✓ Fully managed, highly available with replication across multiple AZs
+
+✓ NoSQL database - NOT a relational database - with transaction support
+
+✓ Scales to massive workloads, distributed database
+
+✓ Millions of requests per seconds, trillions of rows, 100s of TB of storage
+
+✓ Fast and consistent in performance (single-digit millisecond)
+
+✓ Integrated with IAM for security, authorization and administration
+
+✓ Low cost and auto-scaling capabilities
+
+✓ No maintenance or patching, always available
+
+✓ Standard & Infrequent Access (IA) Table Class
+```
+
+### Key Characteristics:
+
+```
+DYNAMODB CHARACTERISTICS:
+─────────────────────────────────────────────────
+
+MANAGED:
+✓ Fully managed by AWS
+✓ No servers to provision
+✓ No patching or maintenance
+
+SCALABLE:
+✓ Scales automatically
+✓ Handles millions of requests/second
+✓ Trillions of rows
+
+FAST:
+✓ Single-digit millisecond latency
+✓ Consistent performance at any scale
+
+AVAILABLE:
+✓ Multi-AZ by default
+✓ 99.999% availability (Global Tables)
+✓ Built-in fault tolerance
+
+SECURE:
+✓ IAM integration
+✓ Encryption at rest
+✓ VPC endpoints available
+```
+
+### NoSQL vs SQL:
+
+```
+SQL DATABASE:                    NoSQL DATABASE (DynamoDB):
+─────────────────────────────    ─────────────────────────────
+Fixed schema                     Flexible schema
+Tables with rows/columns         Tables with items/attributes
+Relationships (joins)            No joins (denormalized)
+Vertical scaling                 Horizontal scaling
+ACID transactions                ACID transactions (optional)
+Good for complex queries         Good for simple queries at scale
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 2. DYNAMODB - BASICS
+
+### Core Concepts:
+
+```
+DYNAMODB BASICS:
+─────────────────────────────────────────────────
+✓ DynamoDB is made of TABLES
+
+✓ Each table has a PRIMARY KEY (must be decided at creation time)
+
+✓ Each table can have an infinite number of ITEMS (= rows)
+
+✓ Each item has ATTRIBUTES (can be added over time – can be null)
+
+✓ Maximum size of an item is 400KB
+
+✓ Data types supported are:
+  - Scalar Types – String, Number, Binary, Boolean, Null
+  - Document Types – List, Map
+  - Set Types – String Set, Number Set, Binary Set
+
+✓ Therefore, in DynamoDB you can rapidly EVOLVE SCHEMAS
+```
+
+### Table Structure:
+
+```
+DYNAMODB TABLE STRUCTURE:
+─────────────────────────────────────────────────
+
+TABLE = Collection of Items
+  │
+  ├── ITEM 1 (row)
+  │     ├── Primary Key (required)
+  │     ├── Attribute 1
+  │     ├── Attribute 2
+  │     └── Attribute N
+  │
+  ├── ITEM 2 (row)
+  │     ├── Primary Key (required)
+  │     ├── Attribute 1
+  │     └── Attribute 3 (different from Item 1!)
+  │
+  └── ITEM N...
+```
+
+### Primary Key Types:
+
+```
+PRIMARY KEY OPTIONS:
+─────────────────────────────────────────────────
+
+1. PARTITION KEY ONLY (Simple Primary Key):
+   - One attribute that uniquely identifies item
+   - Example: user_id
+
+2. PARTITION KEY + SORT KEY (Composite Primary Key):
+   - Combination of two attributes
+   - Partition Key: Groups items
+   - Sort Key: Orders items within partition
+   - Example: user_id (partition) + timestamp (sort)
+```
+
+### Data Types:
+
+```
+SCALAR TYPES:
+- String: "Hello World"
+- Number: 123, 3.14
+- Binary: Base64 encoded data
+- Boolean: true, false
+- Null: null
+
+DOCUMENT TYPES:
+- List: ["a", "b", "c"]
+- Map: {"name": "John", "age": 30}
+
+SET TYPES:
+- String Set: {"apple", "banana", "cherry"}
+- Number Set: {1, 2, 3, 4, 5}
+- Binary Set: {binary1, binary2}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 3. DYNAMODB – TABLE EXAMPLE
+
+### Example Table: Game Scores
+
+```
+┌────────────────────────────────────────────────────────────────────────────┐
+│                              Primary Key                    Attributes     │
+│                    ┌─────────────────────────────┐     ┌────────────────┐  │
+│                    │  Partition Key │  Sort Key  │     │ Score │ Result │  │
+│                    │    User_ID     │  Game_ID   │     │       │        │  │
+│                    ├────────────────┼────────────┼─────┼───────┼────────┤  │
+│                    │ 7791a3d6-...   │    4421    │     │  92   │  Win   │  │
+│                    ├────────────────┼────────────┼─────┼───────┼────────┤  │
+│                    │ 873e0634-...   │    1894    │     │  14   │  Lose  │  │
+│                    ├────────────────┼────────────┼─────┼───────┼────────┤  │
+│                    │ 873e0634-...   │    4521    │     │  77   │  Win   │  │
+│                    └────────────────┴────────────┴─────┴───────┴────────┘  │
+└────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Understanding the Example:
+
+```
+PARTITION KEY (User_ID):
+- Groups all games for a specific user
+- Efficient queries: "Get all games for user X"
+
+SORT KEY (Game_ID):
+- Orders games within a user's partition
+- Efficient queries: "Get game X for user Y"
+
+ATTRIBUTES (Score, Result):
+- Additional data for each item
+- Can vary between items
+- Can be added/modified anytime
+```
+
+### Query Examples:
+
+```
+QUERIES ON THIS TABLE:
+─────────────────────────────────────────────────
+
+1. GET ALL GAMES FOR USER "873e0634-...":
+   Partition Key = "873e0634-..."
+   Returns: 2 items (Game 1894 and 4521)
+
+2. GET SPECIFIC GAME:
+   Partition Key = "873e0634-..."
+   Sort Key = "4521"
+   Returns: 1 item (Score: 77, Result: Win)
+
+3. GET ALL WINS FOR USER:
+   Partition Key = "873e0634-..."
+   Filter: Result = "Win"
+   Returns: 1 item (Game 4521)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 4. DYNAMODB – READ/WRITE CAPACITY MODES
+
+### Concept:
+
+CONTROL HOW YOU MANAGE YOUR TABLE'S CAPACITY (read/write throughput)
+
+### Two Modes:
+
+```
+1. PROVISIONED MODE (default)
+─────────────────────────────────────────────────
+✓ You specify the number of reads/writes per second
+✓ You need to plan capacity beforehand
+✓ Pay for PROVISIONED Read Capacity Units (RCU) & Write Capacity Units (WCU)
+✓ Possibility to add auto-scaling mode for RCU & WCU
+
+
+2. ON-DEMAND MODE
+─────────────────────────────────────────────────
+✓ Read/writes automatically scale up/down with your workloads
+✓ No capacity planning needed
+✓ Pay for what you use, more expensive ($$$)
+✓ Great for UNPREDICTABLE workloads, steep sudden spikes
+```
+
+### Provisioned Mode Details:
+
+```
+PROVISIONED CAPACITY UNITS:
+─────────────────────────────────────────────────
+
+RCU (Read Capacity Unit):
+- 1 RCU = 1 strongly consistent read/second for item up to 4 KB
+- 1 RCU = 2 eventually consistent reads/second for item up to 4 KB
+
+WCU (Write Capacity Unit):
+- 1 WCU = 1 write/second for item up to 1 KB
+
+EXAMPLE:
+- 10 RCU = 10 strongly consistent reads/second (4KB each)
+- 10 WCU = 10 writes/second (1KB each)
+```
+
+### On-Demand Mode Details:
+
+```
+ON-DEMAND MODE:
+─────────────────────────────────────────────────
+✓ No capacity planning
+✓ Automatically scales
+✓ Pay per request
+✓ More expensive but flexible
+✓ Great for:
+  - Unpredictable traffic
+  - New applications
+  - Spiky workloads
+```
+
+### Choosing Between Modes:
+
+```
+CHOOSE PROVISIONED WHEN:
+✓ Predictable workload
+✓ Consistent traffic
+✓ Want to optimize costs
+✓ Can plan capacity
+
+CHOOSE ON-DEMAND WHEN:
+✓ Unpredictable workload
+✓ New application (unknown traffic)
+✓ Sudden spikes
+✓ Would rather pay more for simplicity
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 5. DYNAMODB ACCELERATOR (DAX)
+
+### Concept:
+
+DAX is a fully-managed, highly available, seamless in-memory CACHE for DynamoDB.
+
+```
+DYNAMODB ACCELERATOR (DAX):
+─────────────────────────────────────────────────
+✓ Fully-managed, highly available, seamless in-memory cache for DynamoDB
+
+✓ Help solve read congestion by caching
+
+✓ MICROSECONDS latency for cached data
+
+✓ Doesn't require application logic modification
+  (compatible with existing DynamoDB APIs)
+
+✓ 5 minutes TTL for cache (default)
+```
+
+### Architecture:
+
+```
+DAX ARCHITECTURE:
+─────────────────────────────────────────────────
+
+    ┌─────────────┐
+    │ Application │
+    └──────┬──────┘
+           │
+           │ reads/writes
+           ▼
+    ┌─────────────────────────────────┐
+    │         DAX Cluster             │
+    │  ┌───────┐ ┌───────┐ ┌───────┐ │
+    │  │ CACHE │ │ CACHE │ │ CACHE │ │
+    │  │ Node  │ │ Node  │ │ Node  │ │
+    │  └───────┘ └───────┘ └───────┘ │
+    └──────────────┬──────────────────┘
+                   │
+                   │ cache miss
+                   ▼
+    ┌─────────────────────────────────┐
+    │       Amazon DynamoDB           │
+    │  ┌───────┐ ┌───────┐ ┌───────┐ │
+    │  │ Table │ │ Table │ │ Table │ │
+    │  └───────┘ └───────┘ └───────┘ │
+    └─────────────────────────────────┘
+```
+
+### How DAX Works:
+
+```
+READ FLOW:
+─────────────────────────────────────────────────
+1. Application calls DAX (same API as DynamoDB)
+2. DAX checks cache
+   - Cache HIT: Return data (microseconds!)
+   - Cache MISS: Query DynamoDB, cache result, return data
+3. Application receives data
+
+WRITE FLOW:
+─────────────────────────────────────────────────
+1. Application writes to DAX
+2. DAX writes to DynamoDB
+3. DAX updates cache (write-through)
+```
+
+### Key Benefits:
+
+```
+DAX BENEFITS:
+─────────────────────────────────────────────────
+✓ Microsecond latency (vs milliseconds for DynamoDB)
+✓ No code changes needed
+✓ Reduces DynamoDB read costs
+✓ Handles hot keys/partitions
+✓ Highly available (multi-AZ)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 6. DYNAMODB ACCELERATOR (DAX) VS. ELASTICACHE
+
+### When to Use Which:
+
+```
+DAX VS ELASTICACHE:
+─────────────────────────────────────────────────
+
+                          ┌──────────────────────┐
+                          │   Amazon             │
+         Store Aggregation│   ElastiCache        │
+         Result           │                      │
+              ┌──────────→│   (For aggregation   │
+              │           │    results, complex  │
+              │           │    computations)     │
+              │           └──────────────────────┘
+              │
+┌─────────────┴─────────────┐
+│       Application         │
+└─────────────┬─────────────┘
+              │
+              │ - Individual objects cache
+              │ - Query & Scan cache
+              │
+              ▼
+    ┌─────────────────────────┐
+    │  DynamoDB Accelerator   │
+    │        (DAX)            │
+    │                         │
+    │  (For DynamoDB data     │
+    │   caching)              │
+    └───────────┬─────────────┘
+                │
+                ▼
+    ┌─────────────────────────┐
+    │    Amazon DynamoDB      │
+    └─────────────────────────┘
+```
+
+### Comparison:
+
+```
+USE DAX WHEN:
+─────────────────────────────────────────────────
+✓ Caching DynamoDB data
+✓ Individual object cache
+✓ Query and Scan cache
+✓ Want microsecond latency
+✓ Don't want to change code
+
+USE ELASTICACHE WHEN:
+─────────────────────────────────────────────────
+✓ Store aggregation results
+✓ Store computed results
+✓ Cache data from multiple sources
+✓ Need custom caching logic
+✓ Store session data
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 7. DYNAMODB – STREAM PROCESSING
+
+### Concept:
+
+ORDERED STREAM of item-level modifications (create/update/delete) in a table.
+
+```
+DYNAMODB STREAM PROCESSING:
+─────────────────────────────────────────────────
+✓ Ordered stream of item-level modifications (create/update/delete) in a table
+
+USE CASES:
+✓ React to changes in real-time (welcome email to users)
+✓ Real-time usage analytics
+✓ Insert into derivative tables
+✓ Implement cross-region replication
+✓ Invoke AWS Lambda on changes to your DynamoDB table
+```
+
+### Two Options for Stream Processing:
+
+```
+OPTION 1: DYNAMODB STREAMS
+─────────────────────────────────────────────────
+✓ 24 hours retention
+✓ Limited # of consumers
+✓ Process using AWS Lambda Triggers, or 
+  DynamoDB Stream Kinesis adapter
+
+
+OPTION 2: KINESIS DATA STREAMS (newer)
+─────────────────────────────────────────────────
+✓ 1 year retention
+✓ High # of consumers
+✓ Process using AWS Lambda, Kinesis Data Analytics,
+  Kinesis Data Firehose, AWS Glue Streaming ETL...
+```
+
+### Comparison:
+
+```
+FEATURE                 DYNAMODB STREAMS     KINESIS DATA STREAMS
+────────────────────────────────────────────────────────────────
+Retention               24 hours             1 year
+Consumers               Limited              High
+Processing Options      Lambda, KCL          Lambda, Analytics,
+                                            Firehose, Glue
+Setup                   Built-in             Requires configuration
+Cost                    Lower                Higher
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 8. DYNAMODB STREAMS
+
+### Architecture:
+
+```
+DYNAMODB STREAMS ARCHITECTURE:
+─────────────────────────────────────────────────
+
+                              Processing Layer
+                         ┌─────────────────────────┐
+                         │  DynamoDB              │
+                         │  KCL Adapter ──────────────→ Amazon SNS
+                         │                        │     (messaging,
+                         │  Lambda ───────────────────→  notifications)
+                         │                        │
+                         │         │              │     DDB Table
+                         │         └──────────────────→ (filtering,
+                         └─────────────────────────┘     transforming)
+                                   ▲
+                                   │
+┌──────────────┐        ┌──────────┴──────────┐
+│  Application │───────→│      Table          │
+│              │        │                     │
+│ create/update│        │        │            │
+│    /delete   │        │        ▼            │
+└──────────────┘        │  DynamoDB Streams   │
+                        └─────────────────────┘
+                                   │
+                                   ▼
+                        ┌─────────────────────┐
+                        │ Kinesis Data        │
+                        │ Streams             │
+                        └──────────┬──────────┘
+                                   │
+                    ┌──────────────┼──────────────┐
+                    ▼              ▼              ▼
+               analytics      archiving       indexing
+                    │              │              │
+            ┌───────┴───┐  ┌───────┴────┐  ┌─────┴──────┐
+            │  Amazon   │  │  Kinesis   │  │   Amazon   │
+            │  Redshift │  │  Data      │  │ OpenSearch │
+            │           │  │  Firehose  │  │            │
+            └───────────┘  └─────┬──────┘  └────────────┘
+                                 │
+                                 ▼
+                           ┌───────────┐
+                           │ Amazon S3 │
+                           └───────────┘
+```
+
+### Stream Events:
+
+```
+STREAM RECORD CONTAINS:
+─────────────────────────────────────────────────
+✓ Event type (INSERT, MODIFY, REMOVE)
+✓ Key attributes
+✓ New image (item after modification)
+✓ Old image (item before modification)
+✓ Timestamp
+✓ Sequence number
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 9. DYNAMODB GLOBAL TABLES
+
+### Concept:
+
+Make a DynamoDB table accessible with LOW LATENCY in multiple-regions.
+
+```
+DYNAMODB GLOBAL TABLES:
+─────────────────────────────────────────────────
+✓ Make a DynamoDB table accessible with LOW LATENCY in multiple-regions
+
+✓ Active-Active replication
+
+✓ Applications can READ and WRITE to the table in any region
+
+✓ Must enable DynamoDB Streams as a pre-requisite
+```
+
+### Architecture:
+
+```
+GLOBAL TABLES ARCHITECTURE:
+─────────────────────────────────────────────────
+
+                    GLOBAL TABLE
+        ┌─────────────────────────────────────┐
+        │                                     │
+        │  ┌───────────┐     ┌───────────┐   │
+        │  │   Table   │     │   Table   │   │
+        │  │ US-EAST-1 │◄───►│AP-SOUTHE-2│   │
+        │  │           │     │           │   │
+        │  │ ┌───────┐ │     │ ┌───────┐ │   │
+        │  │ │       │ │     │ │       │ │   │
+        │  │ │       │ │     │ │       │ │   │
+        │  │ │       │ │     │ │       │ │   │
+        │  │ └───────┘ │     │ └───────┘ │   │
+        │  └───────────┘     └───────────┘   │
+        │        ▲      two-way     ▲        │
+        │        │     replication  │        │
+        │        └──────────────────┘        │
+        │                                     │
+        └─────────────────────────────────────┘
+
+Users in US ──→ Read/Write to US-EAST-1
+Users in Asia ──→ Read/Write to AP-SOUTHEAST-2
+```
+
+### Key Points:
+
+```
+GLOBAL TABLES KEY POINTS:
+─────────────────────────────────────────────────
+✓ Active-Active: Both tables can accept writes
+✓ Two-way replication: Changes sync both ways
+✓ Conflict resolution: Last writer wins
+✓ Low latency: Users access nearest region
+✓ Requires: DynamoDB Streams enabled
+```
+
+### Use Cases:
+
+```
+USE CASES:
+─────────────────────────────────────────────────
+✓ Globally distributed applications
+✓ Disaster recovery
+✓ Low-latency global access
+✓ Multi-region applications
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 10. DYNAMODB – TIME TO LIVE (TTL)
+
+### Concept:
+
+Automatically delete items after an expiry timestamp.
+
+```
+DYNAMODB TTL:
+─────────────────────────────────────────────────
+✓ Automatically delete items after an expiry timestamp
+
+USE CASES:
+✓ Reduce stored data by keeping only current items
+✓ Adhere to regulatory obligations
+✓ Web session handling
+```
+
+### How TTL Works:
+
+```
+TTL EXAMPLE:
+─────────────────────────────────────────────────
+
+Current Time: Friday, September 10, 2021, 11:56:11 AM
+(Epoch timestamp: 1631274971)
+
+                                    Expiration Process
+                                          │
+                                    scan & expire items
+                                          │
+                                          ▼
+┌──────────────────────────────────────────────────────────────────┐
+│                    SessionData (Table)                            │
+├───────────────┬──────────────────┬────────────────┬──────────────┤
+│   User_ID     │   Session_ID     │  ExpTime (TTL) │   Status     │
+├───────────────┼──────────────────┼────────────────┼──────────────┤
+│ 7791a3d6-...  │   74686572652    │  1631188571    │   EXPIRED    │
+│ 873e0634-...  │   6e6f7468696    │  1631274971    │   CURRENT    │
+│ a80f73a1-...  │   746f2073656    │  1631102171    │   EXPIRED    │
+└───────────────┴──────────────────┴────────────────┴──────────────┘
+                                          │
+                                    scan & delete items
+                                          │
+                                          ▼
+                                   Deletion Process
+```
+
+### Configuration:
+
+```
+TTL CONFIGURATION:
+─────────────────────────────────────────────────
+1. Choose an attribute to store expiry time (Epoch timestamp)
+2. Enable TTL on the table, specify the attribute
+3. DynamoDB automatically deletes expired items
+4. Deletions are eventually consistent (may take up to 48 hours)
+5. Deleted items can still appear in queries (filter them out)
+6. Items deleted by TTL are removed from GSI/LSI as well
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 11. DYNAMODB – BACKUPS FOR DISASTER RECOVERY
+
+### Two Types of Backups:
+
+```
+1. CONTINUOUS BACKUPS USING POINT-IN-TIME RECOVERY (PITR)
+─────────────────────────────────────────────────
+✓ Optionally enabled for the last 35 days
+✓ Point-in-time recovery to any time within the backup window
+✓ The recovery process creates a NEW table
+
+
+2. ON-DEMAND BACKUPS
+─────────────────────────────────────────────────
+✓ Full backups for long-term retention, until explicitly deleted
+✓ Doesn't affect performance or latency
+✓ Can be configured and managed in AWS Backup 
+  (enables cross-region copy)
+✓ The recovery process creates a NEW table
+```
+
+### PITR Details:
+
+```
+POINT-IN-TIME RECOVERY (PITR):
+─────────────────────────────────────────────────
+✓ Enable: Optional (disabled by default)
+✓ Retention: 35 days
+✓ Recovery: Any second within 35 days
+✓ Creates: NEW table (doesn't overwrite original)
+✓ Use case: Accidental delete, data corruption
+```
+
+### On-Demand Backup Details:
+
+```
+ON-DEMAND BACKUPS:
+─────────────────────────────────────────────────
+✓ Trigger: Manual or scheduled
+✓ Retention: Until deleted
+✓ Performance: No impact
+✓ Cross-region: Via AWS Backup
+✓ Creates: NEW table
+✓ Use case: Long-term archival, compliance
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 12. DYNAMODB – INTEGRATION WITH AMAZON S3
+
+### Export to S3:
+
+```
+EXPORT TO S3 (must enable PITR):
+─────────────────────────────────────────────────
+✓ Works for any point of time in the last 35 days
+✓ Doesn't affect the read capacity of your table
+✓ Perform data analysis on top of DynamoDB
+✓ Retain snapshots for auditing
+✓ ETL on top of S3 data before importing back into DynamoDB
+✓ Export in DynamoDB JSON or ION format
+
+FLOW:
+DynamoDB ──→ export ──→ S3 ──→ query ──→ Athena
+```
+
+### Import from S3:
+
+```
+IMPORT FROM S3:
+─────────────────────────────────────────────────
+✓ Import CSV, DynamoDB JSON or ION format
+✓ Doesn't consume any write capacity
+✓ Creates a NEW table
+✓ Import errors are logged in CloudWatch Logs
+
+FLOW:
+S3 (.csv, .json, .ion) ──→ import ──→ DynamoDB (new table)
+```
+
+### Architecture:
+
+```
+EXPORT/IMPORT ARCHITECTURE:
+─────────────────────────────────────────────────
+
+EXPORT:
+┌───────────┐    export    ┌───────────┐    query    ┌───────────┐
+│ DynamoDB  │─────────────→│  Amazon   │────────────→│  Athena   │
+│           │              │    S3     │             │           │
+└───────────┘              └───────────┘             └───────────┘
+
+
+IMPORT:
+┌───────────┐    import    ┌───────────┐
+│  Amazon   │─────────────→│ DynamoDB  │
+│    S3     │              │(new table)│
+│(.csv,.json│              │           │
+│  .ion)    │              │           │
+└───────────┘              └───────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 13. AWS API GATEWAY
+
+### Overview:
+
+```
+AWS API GATEWAY:
+─────────────────────────────────────────────────
+✓ AWS Lambda + API Gateway: No infrastructure to manage
+
+✓ Support for the WebSocket Protocol
+
+✓ Handle API versioning (v1, v2...)
+
+✓ Handle different environments (dev, test, prod...)
+
+✓ Handle security (Authentication and Authorization)
+
+✓ Create API keys, handle request throttling
+
+✓ Swagger / Open API import to quickly define APIs
+
+✓ Transform and validate requests and responses
+
+✓ Generate SDK and API specifications
+
+✓ Cache API responses
+```
+
+### Key Features:
+
+```
+API GATEWAY FEATURES:
+─────────────────────────────────────────────────
+
+PROTOCOLS:
+✓ REST APIs
+✓ HTTP APIs
+✓ WebSocket APIs
+
+MANAGEMENT:
+✓ Versioning (v1, v2, v3...)
+✓ Stages (dev, test, prod)
+✓ Canary deployments
+
+SECURITY:
+✓ IAM authentication
+✓ Lambda authorizers
+✓ Cognito User Pools
+✓ API keys
+✓ Usage plans
+
+PERFORMANCE:
+✓ Request throttling
+✓ Response caching
+✓ Request/response transformation
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 14. API GATEWAY – INTEGRATIONS HIGH LEVEL
+
+### Integration Types:
+
+```
+1. LAMBDA FUNCTION
+─────────────────────────────────────────────────
+✓ Invoke Lambda function
+✓ Easy way to expose REST API backed by AWS Lambda
+
+
+2. HTTP
+─────────────────────────────────────────────────
+✓ Expose HTTP endpoints in the backend
+✓ Example: internal HTTP API on premise, Application Load Balancer...
+✓ Why? Add rate limiting, caching, user authentications, API keys, etc...
+
+
+3. AWS SERVICE
+─────────────────────────────────────────────────
+✓ Expose any AWS API through the API Gateway
+✓ Example: start an AWS Step Function workflow, post a message to SQS
+✓ Why? Add authentication, deploy publicly, rate control...
+```
+
+### Integration Diagram:
+
+```
+API GATEWAY INTEGRATIONS:
+─────────────────────────────────────────────────
+
+                    ┌─────────────────────────────────────┐
+                    │           API Gateway               │
+                    └─────────────────┬───────────────────┘
+                                      │
+           ┌──────────────────────────┼──────────────────────────┐
+           │                          │                          │
+           ▼                          ▼                          ▼
+   ┌───────────────┐         ┌───────────────┐         ┌───────────────┐
+   │    Lambda     │         │     HTTP      │         │  AWS Service  │
+   │   Function    │         │   Endpoint    │         │               │
+   └───────────────┘         └───────────────┘         └───────────────┘
+   - Serverless              - On-premises API         - Step Functions
+   - Pay per invoke          - ALB                     - SQS
+   - Auto-scaling            - Any HTTP API            - SNS
+                                                       - Any AWS API
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 15. API GATEWAY – AWS SERVICE INTEGRATION (KINESIS EXAMPLE)
+
+### Example: Kinesis Data Streams
+
+```
+KINESIS DATA STREAMS EXAMPLE:
+─────────────────────────────────────────────────
+
+┌────────┐   requests   ┌─────────────┐   send    ┌─────────────┐
+│        │─────────────→│     API     │──────────→│   Kinesis   │
+│ Client │              │   Gateway   │           │    Data     │
+│        │              │             │           │   Streams   │
+└────────┘              └─────────────┘           └──────┬──────┘
+                                                         │
+                                                   records
+                                                         │
+                                                         ▼
+                                                  ┌─────────────┐
+                                                  │   Kinesis   │
+                                                  │    Data     │
+                                                  │  Firehose   │
+                                                  └──────┬──────┘
+                                                         │
+                                                  store .json files
+                                                         │
+                                                         ▼
+                                                  ┌─────────────┐
+                                                  │  Amazon S3  │
+                                                  └─────────────┘
+```
+
+### Why Use API Gateway for AWS Services?
+
+```
+BENEFITS:
+─────────────────────────────────────────────────
+✓ Add authentication (IAM, Cognito, custom)
+✓ Add rate limiting/throttling
+✓ Deploy publicly (expose AWS services securely)
+✓ Add request/response transformation
+✓ Generate SDK for clients
+✓ Monitor with CloudWatch
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 16. API GATEWAY - ENDPOINT TYPES
+
+### Three Endpoint Types:
+
+```
+1. EDGE-OPTIMIZED (default): For global clients
+─────────────────────────────────────────────────
+✓ Requests are routed through the CloudFront Edge locations
+  (improves latency)
+✓ The API Gateway still lives in only one region
+
+
+2. REGIONAL:
+─────────────────────────────────────────────────
+✓ For clients within the same region
+✓ Could manually combine with CloudFront (more control over 
+  the caching strategies and the distribution)
+
+
+3. PRIVATE:
+─────────────────────────────────────────────────
+✓ Can only be accessed from your VPC using an interface 
+  VPC endpoint (ENI)
+✓ Use a resource policy to define access
+```
+
+### Comparison:
+
+```
+ENDPOINT TYPE COMPARISON:
+─────────────────────────────────────────────────
+
+                    EDGE-OPTIMIZED     REGIONAL          PRIVATE
+────────────────────────────────────────────────────────────────────
+Access              Global             Same Region       VPC Only
+CloudFront          Built-in           Manual (optional) No
+Latency             Optimized          Regional          Internal
+Use Case            Global users       Regional users    Internal APIs
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 17. API GATEWAY – SECURITY
+
+### User Authentication Options:
+
+```
+USER AUTHENTICATION THROUGH:
+─────────────────────────────────────────────────
+
+1. IAM ROLES
+   - Useful for internal applications
+   - Users sign requests with IAM credentials
+   - Good for AWS users
+
+2. COGNITO
+   - Identity for external users – example mobile users
+   - Returns JWT token
+   - API Gateway validates token
+
+3. CUSTOM AUTHORIZER (Lambda Authorizer)
+   - Your own logic
+   - Lambda function validates token
+   - Return IAM policy
+```
+
+### HTTPS Security:
+
+```
+CUSTOM DOMAIN NAME HTTPS SECURITY:
+─────────────────────────────────────────────────
+✓ Integration with AWS Certificate Manager (ACM)
+
+✓ If using Edge-Optimized endpoint:
+  - Certificate must be in us-east-1
+
+✓ If using Regional endpoint:
+  - Certificate must be in the API Gateway region
+
+✓ Must setup CNAME or A-alias record in Route 53
+```
+
+### Security Summary:
+
+```
+SECURITY OPTIONS:
+─────────────────────────────────────────────────
+AUTHENTICATION:
+✓ IAM (internal apps, AWS users)
+✓ Cognito (external users, mobile apps)
+✓ Lambda Authorizer (custom logic)
+
+AUTHORIZATION:
+✓ IAM policies
+✓ Lambda Authorizer policies
+✓ Resource policies
+
+ENCRYPTION:
+✓ HTTPS required
+✓ ACM certificates
+✓ Custom domains supported
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 18. AWS STEP FUNCTIONS
+
+### Concept:
+
+Build serverless visual workflow to orchestrate your Lambda functions.
+
+```
+AWS STEP FUNCTIONS:
+─────────────────────────────────────────────────
+✓ Build serverless visual workflow to orchestrate your Lambda functions
+
+FEATURES:
+✓ Sequence
+✓ Parallel
+✓ Conditions
+✓ Timeouts
+✓ Error handling
+
+✓ Can integrate with EC2, ECS, On-premises servers, API Gateway, 
+  SQS queues, etc...
+
+✓ Possibility of implementing human approval feature
+
+USE CASES:
+✓ Order fulfillment
+✓ Data processing
+✓ Web applications
+✓ Any workflow
+```
+
+### Visual Workflow Example:
+
+```
+STEP FUNCTIONS WORKFLOW:
+─────────────────────────────────────────────────
+
+                    ┌───────┐
+                    │ Start │ ■ In Progress
+                    └───┬───┘ ■ Succeeded
+                        │     ■ Failed
+                        ▼     ■ Cancelled
+                    ┌───────┐ ■ Caught Error
+                    │ Pass  │
+                    └───┬───┘
+                        │
+                        ▼
+               ┌────────────────┐
+               │ Hello World    │
+               │ example?       │
+               └───────┬────────┘
+                      ╱╲
+                    ╱    ╲
+                  ╱        ╲
+            Yes ╱            ╲ No
+              ╱                ╲
+             ▼                  ▼
+        ┌─────────┐      ┌─────────────┐
+        │Wait 3   │      │ Hello World │
+        │ sec     │      │             │
+        └────┬────┘      └─────────────┘
+             │
+        ┌────┴────┐
+        │         │
+        ▼         ▼
+    ┌───────┐ ┌───────┐
+    │ Hello │ │ World │
+    └───────┘ └───────┘
+```
+
+### State Types:
+
+```
+STATE TYPES:
+─────────────────────────────────────────────────
+✓ Task: Do some work (Lambda, Activity, AWS Service)
+✓ Choice: Make decisions
+✓ Wait: Delay for specified time
+✓ Parallel: Execute branches in parallel
+✓ Map: Iterate over items
+✓ Pass: Pass input to output
+✓ Succeed: End state (success)
+✓ Fail: End state (failure)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 19. AMAZON COGNITO
+
+### Overview:
+
+```
+AMAZON COGNITO:
+─────────────────────────────────────────────────
+✓ Give users an identity to interact with our web or mobile application
+
+COGNITO USER POOLS:
+✓ Sign in functionality for app users
+✓ Integrate with API Gateway & Application Load Balancer
+
+COGNITO IDENTITY POOLS (Federated Identity):
+✓ Provide AWS credentials to users so they can access AWS resources directly
+✓ Integrate with Cognito User Pools as an identity provider
+
+COGNITO VS IAM:
+✓ "hundreds of users"
+✓ "mobile users"
+✓ "authenticate with SAML"
+→ Think COGNITO!
+```
+
+### Two Main Components:
+
+```
+COGNITO COMPONENTS:
+─────────────────────────────────────────────────
+
+1. USER POOLS
+   - User directory
+   - Sign-up / sign-in
+   - Returns JWT tokens
+   - For: Authentication
+
+2. IDENTITY POOLS
+   - Federated identities
+   - Returns AWS credentials
+   - For: Authorization to AWS resources
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 20. COGNITO USER POOLS (CUP) – USER FEATURES
+
+### Features:
+
+```
+COGNITO USER POOLS - USER FEATURES:
+─────────────────────────────────────────────────
+✓ Create a serverless database of user for your web & mobile apps
+
+✓ Simple login: Username (or email) / password combination
+
+✓ Password reset
+
+✓ Email & Phone Number Verification
+
+✓ Multi-factor authentication (MFA)
+
+✓ Federated Identities: users from Facebook, Google, SAML...
+```
+
+### User Pool Features Detailed:
+
+```
+AUTHENTICATION FEATURES:
+─────────────────────────────────────────────────
+✓ Username/password
+✓ Email/password
+✓ Phone number/password
+✓ Social login (Facebook, Google, Amazon)
+✓ SAML identity providers
+✓ OpenID Connect providers
+
+SECURITY FEATURES:
+─────────────────────────────────────────────────
+✓ MFA (SMS, TOTP)
+✓ Account verification (email, phone)
+✓ Account recovery
+✓ Adaptive authentication
+✓ Compromised credentials check
+
+USER MANAGEMENT:
+─────────────────────────────────────────────────
+✓ User registration
+✓ User profile management
+✓ Custom attributes
+✓ Groups
+✓ Admin user creation
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 21. COGNITO USER POOLS (CUP) - INTEGRATIONS
+
+### Key Integration Point:
+
+CUP integrates with API GATEWAY and APPLICATION LOAD BALANCER
+
+### API Gateway Integration:
+
+```
+API GATEWAY INTEGRATION:
+─────────────────────────────────────────────────
+
+    User                    Cognito              API Gateway         Backend
+      │                    User Pools                │                  │
+      │                        │                     │                  │
+      │   Authenticate         │                     │                  │
+      │───────────────────────→│                     │                  │
+      │                        │                     │                  │
+      │   Retrieve token       │                     │                  │
+      │←───────────────────────│                     │                  │
+      │                        │                     │                  │
+      │               REST API + Pass Token          │                  │
+      │─────────────────────────────────────────────→│                  │
+      │                        │                     │                  │
+      │                        │   Evaluate          │                  │
+      │                        │   Cognito Token     │                  │
+      │                        │←────────────────────│                  │
+      │                        │                     │                  │
+      │                        │                     │    Invoke        │
+      │                        │                     │─────────────────→│
+      │                        │                     │                  │
+      │                        │                     │    Response      │
+      │                        │                     │←─────────────────│
+      │                        │                     │                  │
+      │               Response                       │                  │
+      │←─────────────────────────────────────────────│                  │
+```
+
+### Application Load Balancer Integration:
+
+```
+ALB INTEGRATION:
+─────────────────────────────────────────────────
+
+    User                    Cognito              ALB                  Backend
+      │                    User Pools            + Listeners           (EC2,
+      │                        │                  & Rules             Lambda)
+      │                        │                     │                  │
+      │                   Authenticate               │                  │
+      │───────────────────────→│                     │                  │
+      │                        │                     │                  │
+      │                        │                     │                  │
+      │                    Request                   │                  │
+      │─────────────────────────────────────────────→│                  │
+      │                        │                     │                  │
+      │                        │                     │    Route to      │
+      │                        │                     │    Target Group  │
+      │                        │                     │─────────────────→│
+      │                        │                     │                  │
+      │                        │                     │    Response      │
+      │←─────────────────────────────────────────────│←─────────────────│
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 22. COGNITO IDENTITY POOLS (FEDERATED IDENTITIES)
+
+### Concept:
+
+```
+COGNITO IDENTITY POOLS (FEDERATED IDENTITIES):
+─────────────────────────────────────────────────
+✓ Get identities for "users" so they obtain temporary AWS credentials
+
+✓ Users source can be Cognito User Pools, 3rd party logins, etc...
+
+✓ Users can then access AWS services directly or through API Gateway
+
+✓ The IAM policies applied to the credentials are defined in Cognito
+
+✓ They can be customized based on the user_id for fine grained control
+
+✓ Default IAM roles for authenticated and guest users
+```
+
+### How It Works:
+
+```
+IDENTITY POOLS WORKFLOW:
+─────────────────────────────────────────────────
+1. User authenticates with identity provider
+   (Cognito User Pool, Google, Facebook, SAML, etc.)
+
+2. User receives token from identity provider
+
+3. User exchanges token for AWS credentials via Identity Pool
+
+4. Identity Pool returns temporary AWS credentials
+
+5. User accesses AWS resources directly with credentials
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 23. COGNITO IDENTITY POOLS – DIAGRAM
+
+### Full Authentication Flow:
+
+```
+COGNITO IDENTITY POOLS FLOW:
+─────────────────────────────────────────────────
+
+┌─────────────────┐                           ┌─────────────────────────────┐
+│   Web & Mobile  │                           │   Social Identity Provider  │
+│   Applications  │                           │   ┌───┐  ┌───┐              │
+│   ┌────┐ ┌────┐ │    Login and Get Token    │   │ G │  │ f │   Google,   │
+│   │    │ │    │ │◄─────────────────────────→│   └───┘  └───┘   Facebook  │
+│   └────┘ └────┘ │                           │                             │
+│   ┌────┐        │                           │   SAML       OpenID         │
+│   │ ✓  │        │                           │   ┌───┐      ┌───┐          │
+│   └────┘        │                           │   │   │      │   │          │
+└────────┬────────┘                           │   └───┘      └───┘          │
+         │                                    │                             │
+         │ Exchange token                     │   Cognito User Pools        │
+         │ for temporary                      │   ┌─────────────────┐       │
+         │ AWS credentials                    │   │                 │       │
+         │                                    │   └─────────────────┘       │
+         ▼                                    └─────────────────────────────┘
+┌────────────────────┐                                     │
+│  Cognito Identity  │◄────────────── validate ────────────┘
+│       Pools        │
+└────────┬───────────┘
+         │
+         │ Direct access to AWS
+         │
+         ▼
+┌─────────────────────────────────────┐
+│         Direct access to AWS         │
+│                                      │
+│   ┌──────────────┐  ┌─────────────┐ │
+│   │  Private S3  │  │  DynamoDB   │ │
+│   │    Bucket    │  │    Table    │ │
+│   └──────────────┘  └─────────────┘ │
+│                                      │
+└─────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 24. COGNITO IDENTITY POOLS - ROW LEVEL SECURITY IN DYNAMODB
+
+### Concept:
+
+Fine-grained access control to DynamoDB items based on user identity.
+
+### IAM Policy Example:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "dynamodb:GetItem",
+        "dynamodb:BatchGetItem",
+        "dynamodb:Query",
+        "dynamodb:PutItem",
+        "dynamodb:UpdateItem",
+        "dynamodb:DeleteItem",
+        "dynamodb:BatchWriteItem"
+      ],
+      "Resource": [
+        "arn:aws:dynamodb:us-west-2:123456789012:table/MyTable"
+      ],
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "dynamodb:LeadingKeys": [
+            "${cognito-identity.amazonaws.com:sub}"
+          ]
+        }
+      }
+    }
+  ]
+}
+```
+
+### Key Points:
+
+```
+ROW LEVEL SECURITY:
+─────────────────────────────────────────────────
+✓ Uses IAM policy conditions
+
+✓ "dynamodb:LeadingKeys" must match user's identity
+
+✓ "${cognito-identity.amazonaws.com:sub}" = User's unique ID
+
+✓ Users can ONLY access their own items
+
+✓ Partition key must be the user's Cognito identity ID
+```
+
+### How It Works:
+
+```
+ROW LEVEL SECURITY FLOW:
+─────────────────────────────────────────────────
+
+User A (sub: user-a-123)
+   │
+   │ Query DynamoDB
+   │ Partition Key = user-a-123
+   ▼
+┌─────────────────────────────────────────────────┐
+│                  DynamoDB                        │
+├────────────────┬────────────────────────────────┤
+│  Partition Key │           Data                  │
+├────────────────┼────────────────────────────────┤
+│  user-a-123    │  User A's data    ✓ ALLOWED    │
+│  user-b-456    │  User B's data    ✗ DENIED     │
+│  user-c-789    │  User C's data    ✗ DENIED     │
+└────────────────┴────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              SUMMARY & EXAM TIPS
+═══════════════════════════════════════════════════════════════════════════════
+
+### Quick Reference - Part 2:
+
+```
+DYNAMODB:
+─────────────────────────────────────────────────
+✓ NoSQL, managed, scalable, millisecond latency
+✓ Primary Key = Partition Key (+ optional Sort Key)
+✓ Provisioned mode vs On-Demand mode
+✓ DAX = In-memory cache (microseconds)
+✓ Streams = React to changes
+✓ Global Tables = Multi-region, active-active
+✓ TTL = Auto-delete expired items
+✓ PITR = 35-day point-in-time recovery
+
+API GATEWAY:
+─────────────────────────────────────────────────
+✓ REST/HTTP/WebSocket APIs
+✓ Integrates with Lambda, HTTP, AWS Services
+✓ Edge-Optimized (global), Regional, Private endpoints
+✓ Security: IAM, Cognito, Lambda Authorizer
+
+STEP FUNCTIONS:
+─────────────────────────────────────────────────
+✓ Visual workflows
+✓ Orchestrate Lambda and other services
+✓ States: Task, Choice, Wait, Parallel, Map
+
+COGNITO:
+─────────────────────────────────────────────────
+✓ User Pools = Authentication (returns JWT)
+✓ Identity Pools = Authorization (returns AWS credentials)
+✓ Integrates with API Gateway, ALB
+✓ Federated identities (Google, Facebook, SAML)
+✓ Row-level security with DynamoDB
+```
+
+### Exam Tips:
+
+```
+WHEN TO USE WHAT:
+─────────────────────────────────────────────────
+"NoSQL database with millisecond latency" → DynamoDB
+"Cache for DynamoDB" → DAX
+"React to DynamoDB changes" → DynamoDB Streams
+"Global low-latency database" → DynamoDB Global Tables
+"Expose Lambda as REST API" → API Gateway
+"Orchestrate Lambda functions" → Step Functions
+"User authentication for app" → Cognito User Pools
+"AWS credentials for users" → Cognito Identity Pools
+"Mobile/web app authentication" → Cognito
+"Hundreds of users" → Cognito (not IAM)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF PART 2
+═══════════════════════════════════════════════════════════════════════════════
+
+COMPLETE SERVERLESS GUIDE:
+- Part 1: Lambda, Edge Computing, CloudFront Functions
+- Part 2: DynamoDB, API Gateway, Step Functions, Cognito
+
+═══════════════════════════════════════════════════════════════════════════════
