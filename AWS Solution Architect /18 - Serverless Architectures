@@ -1,1 +1,1557 @@
+# AWS SERVERLESS ARCHITECTURES - COMPLETE GUIDE
+## Real-World Architecture Case Studies and Patterns
 
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS
+═══════════════════════════════════════════════════════════════════════════════
+
+CASE STUDY 1: MOBILE APPLICATION (MyTodoList)
+1. Mobile Application Requirements
+2. Mobile App: REST API Layer
+3. Mobile App: Giving Users Access to S3
+4. Mobile App: High Read Throughput, Static Data
+5. Mobile App: Caching at the API Gateway
+6. Mobile App Architecture Summary
+
+CASE STUDY 2: SERVERLESS WEBSITE (MyBlog.com)
+7. Serverless Hosted Website Requirements
+8. Serving Static Content, Globally
+9. Serving Static Content, Globally, Securely
+10. Adding a Public Serverless REST API
+11. Leveraging DynamoDB Global Tables
+12. User Welcome Email Flow
+13. Thumbnail Generation Flow
+14. AWS Hosted Website Summary
+
+CASE STUDY 3: MICROSERVICES ARCHITECTURE
+15. Micro Services Architecture Concept
+16. Micro Services Environment
+17. Discussions on Micro Services
+
+CASE STUDY 4: SOFTWARE UPDATES OFFLOADING
+18. Software Updates Offloading Problem
+19. Current Application State
+20. Easy Way to Fix Things - CloudFront
+21. Why CloudFront?
+
+═══════════════════════════════════════════════════════════════════════════════
+                    CASE STUDY 1: MOBILE APPLICATION (MyTodoList)
+═══════════════════════════════════════════════════════════════════════════════
+
+## 1. MOBILE APPLICATION: MyTodoList - REQUIREMENTS
+
+### Scenario:
+We want to create a mobile application called "MyTodoList" with specific 
+requirements that need to be addressed using AWS serverless services.
+
+### Requirements:
+
+```
+MOBILE APP REQUIREMENTS:
+─────────────────────────────────────────────────
+
+1. EXPOSE AS REST API WITH HTTPS
+   - Need secure communication
+   - REST API for mobile app to communicate with backend
+
+2. SERVERLESS ARCHITECTURE
+   - No server management
+   - Pay for what you use
+   - Auto-scaling
+
+3. USERS SHOULD BE ABLE TO DIRECTLY INTERACT WITH THEIR OWN FOLDER IN S3
+   - Each user has private storage
+   - Direct access to their files
+   - Not through the application
+
+4. USERS SHOULD AUTHENTICATE THROUGH A MANAGED SERVERLESS SERVICE
+   - Don't want to manage user database
+   - Need secure authentication
+   - Should work with mobile apps
+
+5. THE USERS CAN WRITE AND READ TO-DOS, BUT THEY MOSTLY READ THEM
+   - Read-heavy workload
+   - Need to optimize for reads
+   - Database should scale
+
+6. THE DATABASE SHOULD SCALE, AND HAVE SOME HIGH READ THROUGHPUT
+   - Handle millions of reads
+   - Low latency
+   - Cost effective
+```
+
+### Mapping Requirements to AWS Services:
+
+```
+REQUIREMENT                          AWS SERVICE
+─────────────────────────────────────────────────────────────────────
+REST API with HTTPS                  Amazon API Gateway
+Serverless architecture              AWS Lambda
+User authentication                  Amazon Cognito
+Direct S3 access per user            Cognito Identity Pools + S3
+Scalable database                    Amazon DynamoDB
+High read throughput                 DynamoDB + DAX (caching)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 2. MOBILE APP: REST API LAYER
+
+### Architecture:
+
+```
+MOBILE APP REST API ARCHITECTURE:
+─────────────────────────────────────────────────
+
+                                    Verify authentication
+                                           │
+                ┌──────────────────────────┴─────────────────────────┐
+                │                                                     │
+                ▼                                                     │
+┌─────────┐  REST HTTPS   ┌─────────────┐  invoke  ┌───────┐  query  ┌──────────┐
+│ Mobile  │──────────────→│    Amazon   │─────────→│  AWS  │────────→│  Amazon  │
+│ client  │               │ API Gateway │          │Lambda │         │ DynamoDB │
+└────┬────┘               └─────────────┘          └───────┘         └──────────┘
+     │                           │
+     │                           │
+     │   authenticate            │
+     │                           │
+     ▼                           │
+┌─────────────┐                  │
+│   Amazon    │◄─────────────────┘
+│   Cognito   │
+└─────────────┘
+```
+
+### Flow Explanation:
+
+```
+STEP-BY-STEP FLOW:
+─────────────────────────────────────────────────
+
+1. USER AUTHENTICATES
+   Mobile client → Amazon Cognito
+   - User logs in with username/password
+   - Or uses social login (Google, Facebook)
+   - Cognito returns JWT token
+
+2. CLIENT MAKES API REQUEST
+   Mobile client → API Gateway
+   - Includes JWT token in request header
+   - REST HTTPS call
+
+3. API GATEWAY VERIFIES AUTHENTICATION
+   API Gateway → Amazon Cognito
+   - Validates JWT token
+   - Checks if user is authenticated
+
+4. API GATEWAY INVOKES LAMBDA
+   API Gateway → AWS Lambda
+   - If authentication is valid
+   - Passes user context
+
+5. LAMBDA QUERIES DATABASE
+   Lambda → DynamoDB
+   - Executes business logic
+   - Reads/writes to-do items
+
+6. RESPONSE FLOWS BACK
+   DynamoDB → Lambda → API Gateway → Mobile client
+```
+
+### Services Used and Why:
+
+```
+SERVICE             PURPOSE
+─────────────────────────────────────────────────
+API Gateway         REST API endpoint, HTTPS, throttling
+Cognito             User authentication, managed service
+Lambda              Business logic, serverless compute
+DynamoDB            NoSQL database, scalable, serverless
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 3. MOBILE APP: GIVING USERS ACCESS TO S3
+
+### Requirement:
+Users should be able to directly interact with their own folder in S3.
+
+### Architecture:
+
+```
+MOBILE APP WITH S3 ACCESS:
+─────────────────────────────────────────────────
+
+                    ┌───────────────────┐
+                    │     Amazon S3     │
+                    │                   │
+                    │  /user-123/       │
+                    │  /user-456/       │
+                    │  /user-789/       │
+                    └─────────▲─────────┘
+                              │
+              Store/retrieve files
+              (with Permissions)
+                              │
+┌─────────┐                   │         ┌─────────────┐   ┌───────┐   ┌──────────┐
+│ Mobile  │───────────────────┘         │    Amazon   │   │  AWS  │   │  Amazon  │
+│ client  │                             │ API Gateway │   │Lambda │   │ DynamoDB │
+└────┬────┘                             └─────────────┘   └───────┘   └──────────┘
+     │
+     │   authenticate
+     │
+     ▼
+┌─────────────┐
+│   Amazon    │
+│   Cognito   │
+└─────────────┘
+```
+
+### How It Works:
+
+```
+S3 DIRECT ACCESS FLOW:
+─────────────────────────────────────────────────
+
+1. USER AUTHENTICATES WITH COGNITO
+   Mobile client → Cognito User Pools
+   - Gets JWT token
+
+2. USER EXCHANGES TOKEN FOR AWS CREDENTIALS
+   Mobile client → Cognito Identity Pools
+   - JWT token exchanged for temporary AWS credentials
+   - Credentials scoped to user's folder only!
+
+3. USER DIRECTLY ACCESSES S3
+   Mobile client → Amazon S3
+   - Uses AWS credentials
+   - Can only access their own folder
+   - No Lambda/API Gateway needed for file operations!
+```
+
+### IAM Policy for User-Specific S3 Access:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:GetObject", "s3:PutObject", "s3:DeleteObject"],
+      "Resource": [
+        "arn:aws:s3:::my-bucket/${cognito-identity.amazonaws.com:sub}/*"
+      ]
+    }
+  ]
+}
+```
+
+### Key Points:
+
+```
+IMPORTANT CONCEPTS:
+─────────────────────────────────────────────────
+✓ Cognito Identity Pools provide AWS credentials
+✓ Credentials are TEMPORARY (secure)
+✓ IAM policy restricts access to user's folder only
+✓ ${cognito-identity.amazonaws.com:sub} = unique user ID
+✓ Direct S3 access = faster, cheaper, no Lambda cost
+✓ Pattern can be applied to DynamoDB, Lambda, other services!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 4. MOBILE APP: HIGH READ THROUGHPUT, STATIC DATA
+
+### Problem:
+Users can write and read to-dos, but they MOSTLY READ them.
+Need high read throughput and the data is relatively static.
+
+### Solution: Add DAX Caching Layer
+
+```
+ARCHITECTURE WITH DAX:
+─────────────────────────────────────────────────
+
+                    ┌───────────────────┐
+                    │     Amazon S3     │
+                    └─────────▲─────────┘
+                              │
+              Store/retrieve files
+              (with Permissions)
+                              │
+┌─────────┐                   │         
+│ Mobile  │───────────────────┘         
+│ client  │                             
+└────┬────┴─────────────────────────────────────────────────────────────┐
+     │                                                                   │
+     │   REST HTTPS    ┌─────────────┐  invoke  ┌───────┐  Query/read   │
+     └────────────────→│    Amazon   │─────────→│  AWS  │───────────────┤
+                       │ API Gateway │          │Lambda │               │
+                       └──────┬──────┘          └───────┘               │
+                              │                                         ▼
+                    Verify    │                              ┌─────────────────┐
+                    authentication                           │       DAX       │
+                              │                              │  Caching layer  │
+                              ▼                              └────────┬────────┘
+                       ┌─────────────┐                                │
+                       │   Amazon    │                                ▼
+                       │   Cognito   │                       ┌─────────────────┐
+                       └─────────────┘                       │    DynamoDB     │
+                                                             └─────────────────┘
+```
+
+### Why DAX?
+
+```
+DAX BENEFITS FOR THIS USE CASE:
+─────────────────────────────────────────────────
+
+PROBLEM:
+- Users mostly READ to-dos
+- Same data read multiple times
+- Need low latency
+- DynamoDB read costs add up
+
+SOLUTION - DAX:
+✓ Microsecond latency for cached reads
+✓ Reduces load on DynamoDB
+✓ Reduces read costs
+✓ No code changes needed (same API as DynamoDB)
+✓ Automatic cache invalidation on writes
+```
+
+### Read vs Write Pattern:
+
+```
+DATA ACCESS PATTERN:
+─────────────────────────────────────────────────
+
+WRITES (Less frequent):
+Lambda → DAX → DynamoDB
+- Write-through cache
+- Data written to both DAX and DynamoDB
+
+READS (Very frequent):
+Lambda → DAX
+- Cache HIT: Return immediately (microseconds!)
+- Cache MISS: Fetch from DynamoDB, cache, return
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 5. MOBILE APP: CACHING AT THE API GATEWAY
+
+### Additional Optimization:
+Add caching at the API Gateway level for even better performance.
+
+### Architecture:
+
+```
+ARCHITECTURE WITH API GATEWAY CACHING:
+─────────────────────────────────────────────────
+
+                    ┌───────────────────┐
+                    │     Amazon S3     │
+                    └─────────▲─────────┘
+                              │
+              Store/retrieve files
+              (with Permissions)
+                              │
+┌─────────┐                   │         
+│ Mobile  │───────────────────┘         
+│ client  │                             
+└────┬────┴─────────────────────────────────────────────────────────────┐
+     │                                                                   │
+     │   REST HTTPS    ┌─────────────┐  invoke  ┌───────┐  Query/read   │
+     └────────────────→│    Amazon   │─────────→│  AWS  │───────────────┤
+                       │ API Gateway │          │Lambda │               │
+                       │             │          └───────┘               │
+                       │ ┌─────────┐ │                                  ▼
+                       │ │ CACHING │ │                       ┌─────────────────┐
+                       │ │   OF    │ │                       │       DAX       │
+                       │ │RESPONSES│ │                       │  Caching layer  │
+                       │ └─────────┘ │                       └────────┬────────┘
+                       └──────┬──────┘                                │
+                              │                                       ▼
+                    Verify    │                              ┌─────────────────┐
+                    authentication                           │    DynamoDB     │
+                              │                              └─────────────────┘
+                              ▼                              
+                       ┌─────────────┐                       
+                       │   Amazon    │                       
+                       │   Cognito   │                       
+                       └─────────────┘                       
+```
+
+### Two Levels of Caching:
+
+```
+CACHING LAYERS:
+─────────────────────────────────────────────────
+
+LAYER 1: API GATEWAY CACHE
+─────────────────────────────────────────────────
+✓ Caches entire API responses
+✓ TTL configurable (default 300 seconds)
+✓ Cache key based on request parameters
+✓ Reduces Lambda invocations
+✓ Reduces cost further
+
+LAYER 2: DAX CACHE
+─────────────────────────────────────────────────
+✓ Caches DynamoDB query results
+✓ Microsecond latency
+✓ Used when Lambda is invoked
+```
+
+### Cache Hit Flow:
+
+```
+REQUEST FLOW WITH CACHING:
+─────────────────────────────────────────────────
+
+BEST CASE (API Gateway cache hit):
+Mobile → API Gateway → [CACHE HIT] → Response
+- No Lambda invocation!
+- No DynamoDB read!
+- Fastest response!
+
+MEDIUM CASE (API Gateway miss, DAX hit):
+Mobile → API Gateway → Lambda → DAX → [CACHE HIT] → Response
+- Lambda invoked
+- But DynamoDB not hit
+
+WORST CASE (Both cache miss):
+Mobile → API Gateway → Lambda → DAX → DynamoDB → Response
+- Full path
+- Response cached at both levels for next request
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 6. MOBILE APP ARCHITECTURE SUMMARY
+
+### Key Takeaways from MyTodoList Architecture:
+
+```
+WHAT WE LEARNED - IN THIS LECTURE:
+─────────────────────────────────────────────────
+
+1. SERVERLESS REST API
+   - HTTPS through API Gateway
+   - Lambda for business logic
+   - DynamoDB for data storage
+   - All serverless, all managed!
+
+2. COGNITO FOR TEMPORARY CREDENTIALS
+   - Using Cognito to generate temporary credentials
+   - Access S3 bucket with restricted policy
+   - App users can DIRECTLY access AWS resources
+   - Pattern can be applied to DynamoDB, Lambda, etc.
+
+3. CACHING WITH DAX
+   - Caching the reads on DynamoDB using DAX
+   - Microsecond latency
+   - Reduces costs
+
+4. CACHING WITH API GATEWAY
+   - Caching the REST requests at the API Gateway level
+   - Reduces Lambda invocations
+   - Faster responses
+
+5. SECURITY
+   - Security for authentication and authorization with Cognito
+   - JWT tokens for API access
+   - IAM policies for resource access
+```
+
+### Complete Architecture Diagram:
+
+```
+COMPLETE MyTodoList ARCHITECTURE:
+─────────────────────────────────────────────────
+
+                              ┌─────────────┐
+                              │  Amazon S3  │
+                              │ (User files)│
+                              └──────▲──────┘
+                                     │
+                    Store/retrieve (direct access)
+                                     │
+┌──────────────┐                     │
+│    Mobile    │─────────────────────┘
+│    Client    │
+└──────┬───────┘
+       │
+       ├────────── REST HTTPS ──────────────────────┐
+       │                                            │
+       │                                            ▼
+       │                              ┌─────────────────────────┐
+       │                              │     API Gateway         │
+       │                              │   ┌───────────────┐     │
+       │                              │   │    CACHE      │     │
+       │                              │   └───────────────┘     │
+       │                              └───────────┬─────────────┘
+       │                                          │
+       │   authenticate                     invoke│
+       │                                          ▼
+       ▼                                    ┌───────────┐
+┌──────────────┐                            │   Lambda  │
+│   Cognito    │                            └─────┬─────┘
+│              │                                  │
+│ User Pools   │◄───── Verify auth ──────────────┤
+│    +         │                                  │ Query/read
+│Identity Pools│                                  ▼
+└──────────────┘                            ┌───────────┐
+                                            │    DAX    │
+                                            │   CACHE   │
+                                            └─────┬─────┘
+                                                  │
+                                                  ▼
+                                            ┌───────────┐
+                                            │ DynamoDB  │
+                                            └───────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                    CASE STUDY 2: SERVERLESS WEBSITE (MyBlog.com)
+═══════════════════════════════════════════════════════════════════════════════
+
+## 7. SERVERLESS HOSTED WEBSITE: MyBlog.com - REQUIREMENTS
+
+### Scenario:
+We want to create a serverless blog website with global reach.
+
+### Requirements:
+
+```
+WEBSITE REQUIREMENTS:
+─────────────────────────────────────────────────
+
+1. THIS WEBSITE SHOULD SCALE GLOBALLY
+   - Users from all over the world
+   - Low latency everywhere
+   - Handle traffic spikes
+
+2. BLOGS ARE RARELY WRITTEN, BUT OFTEN READ
+   - Read-heavy workload
+   - Optimize for reads
+   - Caching is important
+
+3. SOME OF THE WEBSITE IS PURELY STATIC FILES, 
+   THE REST IS A DYNAMIC REST API
+   - Static: HTML, CSS, JS, images
+   - Dynamic: Blog content, user interactions
+
+4. CACHING MUST BE IMPLEMENTED WHERE POSSIBLE
+   - Reduce latency
+   - Reduce costs
+   - Multiple caching layers
+
+5. ANY NEW USERS THAT SUBSCRIBE SHOULD RECEIVE A WELCOME EMAIL
+   - Automated email on user registration
+   - Serverless email service
+
+6. ANY PHOTO UPLOADED TO THE BLOG SHOULD HAVE A THUMBNAIL GENERATED
+   - Automatic image processing
+   - Store thumbnails for fast loading
+```
+
+### Mapping Requirements to AWS Services:
+
+```
+REQUIREMENT                          AWS SERVICE
+─────────────────────────────────────────────────────────────────────
+Global scaling                       CloudFront + S3
+Static content                       S3 + CloudFront
+Dynamic REST API                     API Gateway + Lambda + DynamoDB
+Global database                      DynamoDB Global Tables
+Caching                              CloudFront, API Gateway Cache, DAX
+Welcome emails                       DynamoDB Streams + Lambda + SES
+Thumbnail generation                 S3 Events + Lambda
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 8. SERVING STATIC CONTENT, GLOBALLY
+
+### Architecture:
+
+```
+STATIC CONTENT DELIVERY:
+─────────────────────────────────────────────────
+
+                    ┌─────────────────────────┐
+                    │      Amazon CloudFront   │
+                    │    Global distribution   │◄────────────→ Amazon S3
+                    │                         │
+                    └────────────▲────────────┘
+                                 │
+                    Interaction with
+                    edge locations
+                                 │
+                    ┌────────────┴────────────┐
+                    │         Client          │
+                    │                         │
+                    └─────────────────────────┘
+```
+
+### How It Works:
+
+```
+STATIC CONTENT FLOW:
+─────────────────────────────────────────────────
+
+1. STORE CONTENT IN S3
+   - HTML, CSS, JavaScript
+   - Images, videos
+   - Any static files
+
+2. CLOUDFRONT DISTRIBUTION
+   - Points to S3 as origin
+   - Caches content at edge locations
+   - 400+ edge locations globally!
+
+3. CLIENT REQUEST
+   - User requests content
+   - CloudFront serves from nearest edge
+   - Low latency globally
+
+4. CACHE BEHAVIOR
+   - First request: CloudFront fetches from S3
+   - Subsequent requests: Served from cache
+   - TTL controls cache duration
+```
+
+### Benefits:
+
+```
+CLOUDFRONT + S3 BENEFITS:
+─────────────────────────────────────────────────
+✓ Global distribution (400+ edge locations)
+✓ Low latency for users worldwide
+✓ Reduced load on S3
+✓ Reduced data transfer costs
+✓ DDoS protection
+✓ HTTPS support
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 9. SERVING STATIC CONTENT, GLOBALLY, SECURELY
+
+### Adding Security: Origin Access Control (OAC)
+
+```
+SECURE STATIC CONTENT DELIVERY:
+─────────────────────────────────────────────────
+
+                                  OAC: Origin Access Control
+                                           │
+                    ┌──────────────────────┴──────────────────────┐
+                    │                                              │
+                    │      Amazon CloudFront                       │
+                    │    Global distribution    ◄─────────────────→│ Amazon S3
+                    │                                              │
+                    └────────────▲─────────────┘                   │
+                                 │                                 │
+                    Interaction with                      Bucket policy
+                    edge locations                        Only authorize from
+                                 │                        CloudFront Distribution
+                    ┌────────────┴────────────┐
+                    │         Client          │
+                    └─────────────────────────┘
+```
+
+### What is Origin Access Control (OAC)?
+
+```
+OAC EXPLAINED:
+─────────────────────────────────────────────────
+
+PURPOSE:
+- Restrict direct access to S3 bucket
+- Only CloudFront can access S3
+- Users MUST go through CloudFront
+
+HOW IT WORKS:
+1. CloudFront has OAC configured
+2. S3 bucket policy allows only CloudFront
+3. Direct S3 URLs are blocked
+4. All traffic goes through CloudFront
+```
+
+### S3 Bucket Policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::my-blog-bucket/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::123456789012:distribution/EDFDVBD6EXAMPLE"
+        }
+      }
+    }
+  ]
+}
+```
+
+### Security Benefits:
+
+```
+OAC SECURITY BENEFITS:
+─────────────────────────────────────────────────
+✓ S3 bucket not publicly accessible
+✓ All requests authenticated by CloudFront
+✓ Better security posture
+✓ Can use signed URLs/cookies for private content
+✓ Audit trail through CloudFront logs
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 10. ADDING A PUBLIC SERVERLESS REST API
+
+### Extending Architecture with REST API:
+
+```
+ARCHITECTURE WITH REST API:
+─────────────────────────────────────────────────
+
+                              OAC: Origin Access Control
+                                        │
+              ┌─────────────────────────┴─────────────────────────┐
+              │                                                    │
+              │   Amazon CloudFront  ◄────────────────────────────→│ Amazon S3
+              │   Global distribution                              │
+              │                                                    │ Bucket policy
+              └────────────▲───────────────────────────────────────┘ Only CloudFront
+                           │
+          Interaction with edge
+                           │
+┌─────────┐                │
+│ Client  │────────────────┘
+└────┬────┘
+     │
+     │  REST HTTPS   ┌─────────────┐  invoke  ┌───────┐  Query/read  ┌─────┐  ┌──────────┐
+     └──────────────→│    Amazon   │─────────→│  AWS  │─────────────→│ DAX │─→│ DynamoDB │
+                     │ API Gateway │          │Lambda │              │     │  │          │
+                     └─────────────┘          └───────┘              └─────┘  └──────────┘
+```
+
+### Two Paths for Content:
+
+```
+CONTENT DELIVERY PATHS:
+─────────────────────────────────────────────────
+
+PATH 1: STATIC CONTENT
+Client → CloudFront → S3
+- HTML, CSS, JS, images
+- Cached at edge
+
+PATH 2: DYNAMIC CONTENT (REST API)
+Client → API Gateway → Lambda → DAX → DynamoDB
+- Blog posts, comments
+- User interactions
+- Real-time data
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 11. LEVERAGING DYNAMODB GLOBAL TABLES
+
+### Requirement: 
+Website should scale globally with low latency everywhere.
+
+### Architecture with Global Tables:
+
+```
+ARCHITECTURE WITH GLOBAL TABLES:
+─────────────────────────────────────────────────
+
+                              OAC: Origin Access Control
+                                        │
+              ┌─────────────────────────┴─────────────────────────┐
+              │                                                    │
+              │   Amazon CloudFront  ◄────────────────────────────→│ Amazon S3
+              │   Global distribution                              │
+              │                                                    │ Bucket policy
+              └────────────▲───────────────────────────────────────┘ 
+                           │
+          Interaction with edge
+                           │
+┌─────────┐                │
+│ Client  │────────────────┘
+└────┬────┘
+     │
+     │  REST HTTPS   ┌─────────────┐  invoke  ┌───────┐  Query/read  ┌─────┐  ┌──────────────┐
+     └──────────────→│    Amazon   │─────────→│  AWS  │─────────────→│ DAX │─→│   DynamoDB   │
+                     │ API Gateway │          │Lambda │              │     │  │ Global Tables│
+                     └─────────────┘          └───────┘              └─────┘  └──────────────┘
+```
+
+### Global Tables Benefits:
+
+```
+DYNAMODB GLOBAL TABLES:
+─────────────────────────────────────────────────
+
+WHAT IT PROVIDES:
+✓ Multi-region replication
+✓ Active-active (read/write in any region)
+✓ Low latency reads globally
+✓ Automatic conflict resolution
+
+HOW IT WORKS:
+┌──────────────────┐          ┌──────────────────┐
+│    DynamoDB      │  ◄────►  │    DynamoDB      │
+│    US-EAST-1     │  two-way │   EU-WEST-1      │
+│                  │  sync    │                  │
+└──────────────────┘          └──────────────────┘
+
+Users in US → Read/Write US table
+Users in EU → Read/Write EU table
+Changes replicated automatically!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 12. USER WELCOME EMAIL FLOW
+
+### Requirement:
+Any new users that subscribe should receive a welcome email.
+
+### Architecture:
+
+```
+USER WELCOME EMAIL ARCHITECTURE:
+─────────────────────────────────────────────────
+
+[EXISTING ARCHITECTURE - Static content, REST API, etc.]
+
+                                           │
+                                           │
+                                           ▼
+                                    ┌──────────────┐
+                                    │   DynamoDB   │
+                                    │              │
+                                    └──────┬───────┘
+                                           │
+                                    Stream changes
+                                           │
+                                           ▼
+                                    ┌──────────────┐
+                                    │   DynamoDB   │
+                                    │    Stream    │
+                                    └──────┬───────┘
+                                           │
+                                    Invoke lambda
+                                           │
+                                           ▼
+                              ┌────────────────────────┐
+                              │      AWS Lambda        │
+                              │   (with IAM Role)      │
+                              └────────────┬───────────┘
+                                           │
+                                    SDK to send email
+                                           │
+                                           ▼
+                              ┌────────────────────────┐
+                              │   Amazon Simple        │
+                              │   Email Service (SES)  │
+                              └────────────────────────┘
+```
+
+### How It Works:
+
+```
+WELCOME EMAIL FLOW:
+─────────────────────────────────────────────────
+
+1. NEW USER SUBSCRIBES
+   - User signs up through REST API
+   - User record written to DynamoDB
+
+2. DYNAMODB STREAM CAPTURES CHANGE
+   - Stream records INSERT event
+   - Contains new user data
+
+3. LAMBDA TRIGGERED
+   - DynamoDB Stream invokes Lambda
+   - Lambda has IAM role with SES permissions
+
+4. LAMBDA SENDS EMAIL
+   - Uses AWS SDK
+   - Calls SES to send welcome email
+
+5. USER RECEIVES EMAIL
+   - SES delivers email
+   - Welcome message received!
+```
+
+### Key Components:
+
+```
+COMPONENTS USED:
+─────────────────────────────────────────────────
+
+DYNAMODB STREAMS:
+- Captures item-level changes
+- INSERT, MODIFY, DELETE events
+- Near real-time
+
+LAMBDA:
+- Triggered by DynamoDB Streams
+- Contains email logic
+- Has IAM role for SES
+
+SES (Simple Email Service):
+- Sends emails
+- Managed, scalable
+- High deliverability
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 13. THUMBNAIL GENERATION FLOW
+
+### Requirement:
+Any photo uploaded to the blog should have a thumbnail generated.
+
+### Architecture:
+
+```
+THUMBNAIL GENERATION ARCHITECTURE:
+─────────────────────────────────────────────────
+
+[EXISTING ARCHITECTURE - Static content, REST API, Welcome Email, etc.]
+
+                                               
+┌─────────┐                                    
+│ Client  │                                    
+└────┬────┘                                    
+     │                                         
+     │  Upload photos                          
+     │  Transfer acceleration                  
+     │                                         
+     ▼                                         
+┌─────────────────┐                            
+│ Amazon CloudFront│                            
+│ Global distribution                           
+└────────┬────────┘                            
+         │                                     
+         │  OAC                                
+         ▼                                     
+┌─────────────────┐     trigger    ┌───────────┐    thumbnail    ┌───────────────┐
+│   Amazon S3     │───────────────→│   Lambda  │───────────────→│   Amazon S3   │
+│ (Original photos)│               │           │                 │  (Thumbnails) │
+└─────────────────┘               └───────────┘                 └───────┬───────┘
+                                                                        │
+                                                                 optional│
+                                                    ┌───────────────────┼────────────────┐
+                                                    │                   │                │
+                                                    ▼                   ▼                ▼
+                                               ┌─────────┐        ┌──────────┐    ┌───────────┐
+                                               │   SQS   │        │   SNS    │    │ DynamoDB  │
+                                               └─────────┘        └──────────┘    │(metadata) │
+                                                                                  └───────────┘
+```
+
+### Flow Explanation:
+
+```
+THUMBNAIL GENERATION FLOW:
+─────────────────────────────────────────────────
+
+1. USER UPLOADS PHOTO
+   - Via CloudFront (transfer acceleration)
+   - Stored in S3 (original photos bucket)
+
+2. S3 EVENT TRIGGERS LAMBDA
+   - S3 event notification on PUT
+   - Lambda function invoked
+
+3. LAMBDA GENERATES THUMBNAIL
+   - Downloads original image
+   - Resizes/compresses
+   - Saves to thumbnails bucket
+
+4. OPTIONAL: ADDITIONAL PROCESSING
+   - SQS: Queue for further processing
+   - SNS: Notify other services
+   - DynamoDB: Store metadata (name, size, date)
+```
+
+### S3 Event Configuration:
+
+```
+S3 EVENT NOTIFICATIONS:
+─────────────────────────────────────────────────
+
+EVENT TYPES:
+✓ s3:ObjectCreated:* (any create)
+✓ s3:ObjectCreated:Put
+✓ s3:ObjectCreated:Post
+✓ s3:ObjectCreated:Copy
+
+DESTINATIONS:
+✓ Lambda function
+✓ SQS queue
+✓ SNS topic
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 14. AWS HOSTED WEBSITE SUMMARY
+
+### Key Takeaways from MyBlog.com Architecture:
+
+```
+AWS HOSTED WEBSITE SUMMARY:
+─────────────────────────────────────────────────
+
+1. STATIC CONTENT DISTRIBUTION
+   ✓ Static content distributed using CloudFront with S3
+   ✓ OAC for security (only CloudFront can access S3)
+   ✓ Global low-latency access
+
+2. SERVERLESS REST API
+   ✓ REST API was serverless (API Gateway + Lambda)
+   ✓ Didn't need Cognito because public blog
+   ✓ Caching with DAX for high read throughput
+
+3. GLOBAL DATABASE
+   ✓ Leveraged Global DynamoDB table to serve data globally
+   ✓ Alternative: Could have used Aurora Global Database
+   ✓ Active-active replication
+
+4. AUTOMATED EMAIL NOTIFICATIONS
+   ✓ DynamoDB Streams trigger Lambda function
+   ✓ Lambda has IAM role to use SES
+   ✓ SES sends emails in serverless way
+
+5. IMAGE PROCESSING
+   ✓ S3 can trigger SQS / SNS / Lambda on events
+   ✓ Lambda generates thumbnails
+   ✓ Can store metadata in DynamoDB
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                    CASE STUDY 3: MICROSERVICES ARCHITECTURE
+═══════════════════════════════════════════════════════════════════════════════
+
+## 15. MICRO SERVICES ARCHITECTURE CONCEPT
+
+### What is Microservices Architecture?
+
+```
+MICRO SERVICES ARCHITECTURE:
+─────────────────────────────────────────────────
+
+✓ We want to switch to a micro service architecture
+
+✓ Many services interact with each other directly using a REST API
+
+✓ Each architecture for each micro service may vary in form and shape
+
+✓ We want a micro-service architecture so we can have a LEANER 
+  DEVELOPMENT LIFECYCLE for each service
+```
+
+### Microservices vs Monolith:
+
+```
+MONOLITH:                        MICROSERVICES:
+─────────────────────            ─────────────────────
+┌─────────────────┐              ┌────┐  ┌────┐  ┌────┐
+│                 │              │Svc1│  │Svc2│  │Svc3│
+│   EVERYTHING    │              └──┬─┘  └──┬─┘  └──┬─┘
+│   IN ONE APP    │                 │       │       │
+│                 │                 └───────┼───────┘
+│                 │                    REST APIs
+└─────────────────┘
+
+- Single deployment              - Independent deployments
+- Coupled components             - Loosely coupled
+- Scale everything               - Scale individually
+- One tech stack                 - Multiple tech stacks
+```
+
+### Benefits of Microservices:
+
+```
+MICROSERVICES BENEFITS:
+─────────────────────────────────────────────────
+✓ Independent deployment
+✓ Independent scaling
+✓ Team autonomy
+✓ Technology flexibility
+✓ Fault isolation
+✓ Faster development cycles
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 16. MICRO SERVICES ENVIRONMENT
+
+### Example Microservices Architecture:
+
+```
+MICRO SERVICES ENVIRONMENT:
+─────────────────────────────────────────────────
+
+                    DNS Query
+                        │
+                        ▼
+                ┌──────────────┐
+                │ Amazon       │
+                │ Route 53     │
+                └──────┬───────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+        ▼              ▼              ▼
+┌──────────────────────────────────────────────────────────────────────────┐
+│                                                                          │
+│  service1.example.com        service2.example.com     service3.example.com
+│                                                                          │
+│  ┌─────────────┐            ┌─────────────┐          ┌─────────────┐    │
+│  │   Elastic   │            │    Amazon   │          │   Elastic   │    │
+│  │    Load     │            │ API Gateway │          │    Load     │    │
+│  │  Balancing  │            └──────┬──────┘          │  Balancing  │    │
+│  └──────┬──────┘                   │                 └──────┬──────┘    │
+│         │                          │                        │           │
+│         ▼                          ▼                        ▼           │
+│  ┌─────────────┐            ┌─────────────┐          ┌─────────────┐    │
+│  │     ECS     │            │ AWS Lambda  │          │  Amazon EC2 │    │
+│  │             │            │             │          │ Auto Scaling│    │
+│  └──────┬──────┘            └──────┬──────┘          └──────┬──────┘    │
+│         │                          │                        │           │
+│         ▼                          ▼                        ▼           │
+│  ┌─────────────┐            ┌─────────────┐          ┌─────────────┐    │
+│  │  DynamoDB   │            │ ElastiCache │          │ Amazon RDS  │    │
+│  └─────────────┘            └─────────────┘          └─────────────┘    │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+        │                              │                        │
+        │         HTTPS                │                        │
+        │◄─────────────────────────────┼────────────────────────┤
+        │                              │                        │
+        ▼                              ▼                        ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │                          Users                                │
+    └──────────────────────────────────────────────────────────────┘
+```
+
+### Each Service Can Be Different:
+
+```
+SERVICE VARIATIONS:
+─────────────────────────────────────────────────
+
+SERVICE 1: Container-based
+- ELB → ECS → DynamoDB
+- Containerized workload
+- NoSQL database
+
+SERVICE 2: Serverless
+- API Gateway → Lambda → ElastiCache
+- Fully serverless
+- In-memory caching
+
+SERVICE 3: Traditional
+- ELB → EC2 Auto Scaling → RDS
+- Virtual machines
+- Relational database
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 17. DISCUSSIONS ON MICRO SERVICES
+
+### Design Freedom:
+
+```
+MICROSERVICES DESIGN:
+─────────────────────────────────────────────────
+
+✓ You are FREE to design each micro-service the way you want!
+
+✓ SYNCHRONOUS PATTERNS:
+  - API Gateway
+  - Load Balancers (ALB, NLB)
+  - Direct service-to-service calls
+
+✓ ASYNCHRONOUS PATTERNS:
+  - SQS (queues)
+  - Kinesis (streaming)
+  - SNS (pub/sub)
+  - Lambda triggers (S3, DynamoDB Streams)
+```
+
+### Challenges with Microservices:
+
+```
+MICROSERVICES CHALLENGES:
+─────────────────────────────────────────────────
+
+1. REPEATED OVERHEAD
+   - Creating each new microservice requires setup
+   - Deployment pipelines, monitoring, etc.
+
+2. SERVER DENSITY/UTILIZATION
+   - Issues with optimizing server utilization
+   - Some services may be underutilized
+
+3. VERSION COMPLEXITY
+   - Running multiple versions simultaneously
+   - Compatibility between services
+
+4. CLIENT-SIDE INTEGRATION
+   - Proliferation of client-side code
+   - Integrate with many separate services
+```
+
+### How Serverless Helps:
+
+```
+SERVERLESS SOLUTIONS:
+─────────────────────────────────────────────────
+
+CHALLENGE                    SERVERLESS SOLUTION
+─────────────────────────────────────────────────────────────────────
+Repeated overhead            Lambda + API Gateway: quick to set up
+Server utilization           Serverless: pay only for what you use
+Multiple versions            API Gateway stages, Lambda versions
+Client integration           API Gateway SDK generation (Swagger)
+Scaling                      Automatic scaling with Lambda
+```
+
+### Summary:
+
+```
+SERVERLESS FOR MICROSERVICES:
+─────────────────────────────────────────────────
+✓ API Gateway, Lambda scale automatically
+✓ Pay per usage
+✓ Easy to clone API, reproduce environments
+✓ Generated client SDK through Swagger integration
+✓ Reduces operational overhead
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                    CASE STUDY 4: SOFTWARE UPDATES OFFLOADING
+═══════════════════════════════════════════════════════════════════════════════
+
+## 18. SOFTWARE UPDATES OFFLOADING PROBLEM
+
+### Scenario:
+
+```
+SOFTWARE UPDATES OFFLOADING PROBLEM:
+─────────────────────────────────────────────────
+
+THE SITUATION:
+✓ We have an application running on EC2
+✓ Distributes software updates once in a while
+✓ These are static files that don't change
+
+THE PROBLEM:
+✓ When a new software update is out...
+✓ We get A LOT of requests!
+✓ Content is distributed in mass over the network
+✓ It's VERY COSTLY (bandwidth, EC2 scaling)
+
+THE CONSTRAINT:
+✓ We don't want to change our application
+✓ But want to optimize our cost and CPU
+✓ How can we do it?
+```
+
+### Cost Issues:
+
+```
+COST ANALYSIS:
+─────────────────────────────────────────────────
+
+CURRENT COSTS DURING SOFTWARE UPDATE:
+- EC2 instances scale up (more cost)
+- Network bandwidth explodes
+- Users experience slow downloads
+- Lots of repeated content served
+
+EXAMPLE:
+- 1GB update file
+- 1 million users
+- Each user downloads from EC2
+- = 1 PB of data transfer from EC2!
+- = MASSIVE cost!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 19. CURRENT APPLICATION STATE
+
+### Current Architecture:
+
+```
+CURRENT APPLICATION STATE:
+─────────────────────────────────────────────────
+
+                                    ┌─────────────────────────────────────┐
+                                    │         Auto Scaling group          │
+                                    │                                     │
+                                    │  ┌─────────────────────────────┐   │
+                                    │  │   Availability zone 1       │   │
+                                    │  │   ┌─────┐    ┌─────┐        │   │
+                                    │  │   │ M5  │    │ M5  │        │   │
+                                    │  │   └─────┘    └─────┘        │   │
+                                    │  └─────────────────────────────┘   │
+                                    │                                     │
+Users ────────→  ┌─────────────┐   │  ┌─────────────────────────────┐   │    ┌─────────────┐
+                 │   Elastic   │───┼─→│   Availability zone 2       │   │───→│   Amazon    │
+                 │    Load     │   │  │   ┌─────┐    ┌─────┐        │   │    │   EFS       │
+                 │  Balancer   │   │  │   │ M5  │    │ M5  │        │   │    │             │
+                 │   AZ 1-3    │   │  │   └─────┘    └─────┘        │   │    └─────────────┘
+                 └─────────────┘   │  └─────────────────────────────┘   │
+                                    │                                     │
+                                    │  ┌─────────────────────────────┐   │
+                                    │  │   Availability zone 3       │   │
+                                    │  │   ┌─────┐                   │   │
+                                    │  │   │ M5  │                   │   │
+                                    │  │   └─────┘                   │   │
+                                    │  └─────────────────────────────┘   │
+                                    │                                     │
+                                    └─────────────────────────────────────┘
+```
+
+### Problems with Current Architecture:
+
+```
+PROBLEMS:
+─────────────────────────────────────────────────
+✗ All traffic hits EC2 instances
+✗ ASG scales up during updates
+✗ High EC2 costs
+✗ High bandwidth costs
+✗ Users far from origin have slow downloads
+✗ Same static file served repeatedly
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 20. EASY WAY TO FIX THINGS - CLOUDFRONT
+
+### Solution: Add CloudFront
+
+```
+ARCHITECTURE WITH CLOUDFRONT:
+─────────────────────────────────────────────────
+
+                                    ┌─────────────────────────────────────┐
+                                    │         Auto Scaling group          │
+                                    │                                     │
+                                    │  ┌─────────────────────────────┐   │
+                                    │  │   Availability zone 1       │   │
+                                    │  │   ┌─────┐    ┌─────┐        │   │
+                                    │  │   │ M5  │    │ M5  │        │   │
+                                    │  │   └─────┘    └─────┘        │   │
+                                    │  └─────────────────────────────┘   │
+         ┌───────────────┐         │                                     │
+Users ──→│   Amazon      │         │  ┌─────────────────────────────┐   │    ┌─────────────┐
+         │  CloudFront   │────────→│  │   Availability zone 2       │   │───→│   Amazon    │
+         │               │         │  │   ┌─────┐    ┌─────┐        │   │    │   EFS       │
+         └───────────────┘         │  │   │ M5  │    │ M5  │        │   │    │             │
+               │                   │  │   └─────┘    └─────┘        │   │    └─────────────┘
+               │                   │  └─────────────────────────────┘   │
+               ▼                   │                                     │
+        ┌─────────────┐            │  ┌─────────────────────────────┐   │
+        │   Elastic   │            │  │   Availability zone 3       │   │
+        │    Load     │◄───────────┼──│   ┌─────┐                   │   │
+        │  Balancer   │            │  │   │ M5  │                   │   │
+        │   AZ 1-3    │            │  │   └─────┘                   │   │
+        └─────────────┘            │  └─────────────────────────────┘   │
+                                    │                                     │
+                                    └─────────────────────────────────────┘
+```
+
+### What Changed:
+
+```
+CHANGES MADE:
+─────────────────────────────────────────────────
+✓ Added CloudFront in front of ELB
+✓ NO changes to application!
+✓ NO changes to EC2 instances!
+✓ Simple configuration change
+
+TRAFFIC FLOW NOW:
+Users → CloudFront → (cache HIT) → Response
+Users → CloudFront → (cache MISS) → ELB → EC2 → Response (cached)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## 21. WHY CLOUDFRONT?
+
+### Benefits of Using CloudFront:
+
+```
+WHY CLOUDFRONT FOR SOFTWARE UPDATES:
+─────────────────────────────────────────────────
+
+1. NO CHANGES TO ARCHITECTURE
+   ✓ Keep existing application
+   ✓ Keep EC2, ELB setup
+   ✓ Just add CloudFront in front
+
+2. CACHING AT THE EDGE
+   ✓ Will cache software update files at the edge
+   ✓ 400+ edge locations globally
+   ✓ Users download from nearest edge
+
+3. STATIC FILES = PERFECT FOR CACHING
+   ✓ Software update files are NOT dynamic
+   ✓ They're static (never changing)
+   ✓ Perfect for CDN caching
+
+4. SERVERLESS SCALING
+   ✓ Our EC2 instances aren't serverless
+   ✓ But CloudFront IS serverless
+   ✓ CloudFront will scale for us automatically
+
+5. REDUCED ASG SCALING
+   ✓ Our ASG will NOT scale as much
+   ✓ Most requests served from CloudFront cache
+   ✓ Save TREMENDOUSLY on EC2 costs
+
+6. ADDITIONAL SAVINGS
+   ✓ Save on availability
+   ✓ Save on network bandwidth costs
+   ✓ Reduced data transfer from origin
+
+7. EASY IMPLEMENTATION
+   ✓ Easy way to make existing application more scalable
+   ✓ Easy way to make it CHEAPER!
+   ✓ Quick win!
+```
+
+### Cost Comparison:
+
+```
+COST COMPARISON:
+─────────────────────────────────────────────────
+
+WITHOUT CLOUDFRONT:
+- 1M users × 1GB = 1PB data transfer
+- All from EC2/ELB
+- EC2 scales to handle load
+- VERY EXPENSIVE
+
+WITH CLOUDFRONT:
+- First request: EC2 serves, CloudFront caches
+- Subsequent requests: CloudFront serves
+- EC2 stays minimal
+- CloudFront data transfer is cheaper
+- MUCH CHEAPER!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              SUMMARY & EXAM TIPS
+═══════════════════════════════════════════════════════════════════════════════
+
+### Architecture Patterns Summary:
+
+```
+SERVERLESS ARCHITECTURE PATTERNS:
+─────────────────────────────────────────────────
+
+MOBILE APP PATTERN:
+- Cognito for auth
+- API Gateway + Lambda for API
+- DynamoDB + DAX for data
+- S3 for user files (direct access via Identity Pools)
+- Multiple caching layers
+
+WEBSITE PATTERN:
+- CloudFront + S3 for static content
+- OAC for security
+- API Gateway + Lambda for dynamic content
+- DynamoDB Global Tables for global data
+- DynamoDB Streams + Lambda + SES for emails
+- S3 events + Lambda for image processing
+
+MICROSERVICES PATTERN:
+- Each service can have different architecture
+- Route 53 for DNS
+- Mix of ELB, API Gateway, ECS, Lambda, EC2
+- Async patterns: SQS, SNS, Kinesis
+
+OFFLOADING PATTERN:
+- Add CloudFront in front of existing architecture
+- Cache static content at edge
+- No changes to application needed
+- Massive cost savings
+```
+
+### Exam Tips:
+
+```
+EXAM TIPS - WHEN TO USE WHAT:
+─────────────────────────────────────────────────
+
+"User files with direct access"
+→ Cognito Identity Pools + S3
+
+"High read throughput"
+→ DAX for DynamoDB, API Gateway cache
+
+"Global website"
+→ CloudFront + S3 + DynamoDB Global Tables
+
+"Send email on data change"
+→ DynamoDB Streams + Lambda + SES
+
+"Generate thumbnails"
+→ S3 Events + Lambda
+
+"Cache static content globally"
+→ CloudFront
+
+"Microservices REST API"
+→ API Gateway + Lambda (or ELB + ECS/EC2)
+
+"Reduce costs for static file distribution"
+→ Add CloudFront in front
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF GUIDE
+═══════════════════════════════════════════════════════════════════════════════
+
+This guide covers all Serverless Architecture case studies:
+✓ Mobile Application (MyTodoList)
+✓ Serverless Website (MyBlog.com)
+✓ Microservices Architecture
+✓ Software Updates Offloading
+
+All explained with:
+- Detailed architecture diagrams
+- Step-by-step flows
+- Service selection rationale
+- Cost considerations
+- Exam tips
+
+═══════════════════════════════════════════════════════════════════════════════
