@@ -1,1 +1,2632 @@
+# AWS MONITORING, AUDIT AND PERFORMANCE - COMPLETE GUIDE (PART 1)
+## CloudWatch, CloudTrail & AWS Config
 
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+This guide covers CloudWatch Metrics, Logs, Alarms, and EventBridge:
+
+1. AWS Monitoring, Audit and Performance (Overview)
+2. Amazon CloudWatch Metrics
+3. CloudWatch Metric Streams
+4. CloudWatch Logs
+5. CloudWatch Logs - Sources
+6. CloudWatch Logs Insights
+7. CloudWatch Logs – S3 Export
+8. CloudWatch Logs Subscriptions
+9. CloudWatch Logs Aggregation Multi-Account & Multi Region
+10. CloudWatch Logs Subscriptions (Cross-Account)
+11. CloudWatch Logs for EC2
+12. CloudWatch Logs Agent & Unified Agent
+13. CloudWatch Unified Agent – Metrics
+14. CloudWatch Alarms
+15. CloudWatch Alarm Targets
+16. CloudWatch Alarms – Composite Alarms
+17. EC2 Instance Recovery
+18. CloudWatch Alarm: Good to Know
+19. Amazon EventBridge (formerly CloudWatch Events)
+20. Amazon EventBridge Rules
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 1: AWS MONITORING, AUDIT AND PERFORMANCE
+
+### Title Slide Overview:
+
+This section covers the three main pillars of AWS observability:
+
+1. CLOUDWATCH
+   - Metrics collection and monitoring
+   - Logs aggregation and analysis
+   - Alarms and notifications
+   - Dashboards and visualization
+
+2. CLOUDTRAIL
+   - API call auditing
+   - Governance and compliance
+   - Security analysis
+
+3. AWS CONFIG
+   - Configuration tracking
+   - Compliance monitoring
+   - Change management
+
+### Why Monitoring Matters:
+
+```
+WITHOUT MONITORING:
+- Don't know when things break
+- Can't identify performance issues
+- No visibility into resource usage
+- Security incidents go unnoticed
+- Compliance violations undetected
+
+WITH MONITORING:
+- Proactive issue detection
+- Performance optimization
+- Cost management
+- Security visibility
+- Compliance assurance
+```
+
+### The Three Services Compared:
+
+```
+SERVICE          FOCUS                    QUESTION IT ANSWERS
+─────────────────────────────────────────────────────────────────────────
+CloudWatch       Performance metrics      "How is my system performing?"
+CloudTrail       API activity audit       "Who did what in my account?"
+AWS Config       Configuration state      "How has my config changed?"
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 2: AMAZON CLOUDWATCH METRICS
+
+### Concept:
+CloudWatch provides metrics for every service in AWS, allowing you to monitor 
+and observe the performance of your resources.
+
+### Key Features:
+
+1. METRICS FOR EVERY SERVICE
+   - CloudWatch provides metrics for every AWS service
+   - Automatic collection for most services
+   - No setup required for standard metrics
+
+2. WHAT IS A METRIC?
+   - Metric is a VARIABLE to monitor
+   - Examples: CPUUtilization, NetworkIn, NetworkOut
+   - Numeric values over time
+
+3. NAMESPACES
+   - Metrics belong to namespaces
+   - Example: AWS/EC2, AWS/RDS, AWS/Lambda
+   - Organizes metrics by service
+
+4. DIMENSIONS
+   - Dimension is an ATTRIBUTE of a metric
+   - Examples: instance id, environment, etc.
+   - Up to 30 dimensions per metric
+
+5. TIMESTAMPS
+   - Metrics have timestamps
+   - Track values over time
+   - Historical data retention
+
+6. DASHBOARDS
+   - Can create CloudWatch dashboards of metrics
+   - Visualize multiple metrics together
+   - Custom layouts
+
+7. CUSTOM METRICS
+   - Can create CloudWatch Custom Metrics
+   - Example: RAM utilization (not provided by default)
+   - Use PutMetricData API
+
+### Standard vs Custom Metrics:
+
+```
+STANDARD METRICS (Automatic):          CUSTOM METRICS (You Create):
+─────────────────────────────────────────────────────────────────
+EC2:                                   - RAM / Memory utilization
+- CPUUtilization                       - Disk space utilization
+- NetworkIn/Out                        - Application-specific metrics
+- DiskReadOps/WriteOps                 - Business metrics
+- StatusCheckFailed                    - Custom counters
+                                       
+RDS:                                   
+- DatabaseConnections                  
+- FreeableMemory                       
+- ReadIOPS/WriteIOPS                   
+```
+
+### Metric Resolution:
+
+```
+STANDARD RESOLUTION:
+- 1-minute granularity
+- Free for most metrics
+- Default for AWS services
+
+HIGH RESOLUTION:
+- Up to 1-second granularity
+- Custom metrics only
+- Additional cost
+- Use for real-time monitoring
+```
+
+### Architecture:
+
+```
+CLOUDWATCH METRICS FLOW:
+
+AWS Services                          CloudWatch
+─────────────────                    ─────────────
+                                     
+┌──────────┐                         ┌─────────────────────┐
+│   EC2    │──── metrics ───────────►│                     │
+└──────────┘                         │    CloudWatch       │
+                                     │                     │
+┌──────────┐                         │  ┌───────────────┐  │
+│   RDS    │──── metrics ───────────►│  │   Metrics     │  │
+└──────────┘                         │  │   Database    │  │
+                                     │  └───────────────┘  │
+┌──────────┐                         │         │          │
+│  Lambda  │──── metrics ───────────►│         ▼          │
+└──────────┘                         │  ┌───────────────┐  │
+                                     │  │  Dashboards   │  │
+┌──────────┐                         │  │   & Alarms    │  │
+│Your App  │── custom metrics ──────►│  └───────────────┘  │
+│(PutMetric│                         │                     │
+│  Data)   │                         └─────────────────────┘
+└──────────┘
+```
+
+### Real-Life Example:
+Think of CloudWatch Metrics as a CAR DASHBOARD:
+
+```
+CAR DASHBOARD:                        CLOUDWATCH:
+- Speedometer                         - CPUUtilization
+- Fuel gauge                          - MemoryUtilization
+- Temperature gauge                   - NetworkIn/Out
+- Engine light                        - StatusCheck
+- Custom gauges (aftermarket)         - Custom Metrics
+```
+
+### Daily Use Cases:
+
+✓ Performance Monitoring: Track CPU, memory, network
+✓ Capacity Planning: Identify trends
+✓ Alerting: Trigger alarms on thresholds
+✓ Troubleshooting: Diagnose issues
+✓ Dashboards: Executive visibility
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 3: CLOUDWATCH METRIC STREAMS
+
+### Concept:
+CloudWatch Metric Streams allows you to continually stream CloudWatch metrics 
+to a destination of your choice with near-real-time delivery and low latency.
+
+### Key Features:
+
+1. CONTINUAL STREAMING
+   - Stream CloudWatch metrics to a destination of your choice
+   - Near-real-time delivery
+   - Low latency
+
+2. DESTINATIONS
+   - Amazon Kinesis Data Firehose (and then its destinations)
+   - From Firehose to:
+     - Amazon S3
+     - Amazon Redshift
+     - Amazon OpenSearch
+
+3. THIRD-PARTY PROVIDERS
+   - Datadog
+   - Dynatrace
+   - New Relic
+   - Splunk
+   - Sumo Logic
+   - And more!
+
+4. FILTERING
+   - Option to filter metrics
+   - Only stream a subset of metrics
+   - Reduce costs and noise
+
+### Architecture:
+
+```
+CLOUDWATCH METRIC STREAMS:
+
+┌─────────────────────┐
+│  CloudWatch Metrics │
+└──────────┬──────────┘
+           │
+           │ Stream near-real-time
+           ▼
+┌─────────────────────┐
+│ Kinesis Data        │
+│ Firehose            │
+└──────────┬──────────┘
+           │
+     ┌─────┼─────┬─────────────┐
+     │     │     │             │
+     ▼     ▼     ▼             ▼
+┌──────┐ ┌────────┐ ┌──────────┐ ┌─────────────┐
+│  S3  │ │Redshift│ │OpenSearch│ │ 3rd Party   │
+│      │ │        │ │          │ │ (Datadog,   │
+│      │ │        │ │          │ │  Splunk...) │
+└──────┘ └────────┘ └──────────┘ └─────────────┘
+           │
+           ▼
+      ┌─────────┐
+      │ Athena  │ (query S3 data)
+      └─────────┘
+```
+
+### Use Cases:
+
+1. THIRD-PARTY MONITORING
+   - Send metrics to Datadog, New Relic, etc.
+   - Unified monitoring across clouds
+   - Advanced analytics
+
+2. LONG-TERM STORAGE
+   - Archive metrics to S3
+   - Retain beyond CloudWatch limits
+   - Cost-effective storage
+
+3. DATA LAKE ANALYTICS
+   - Stream to Redshift for BI
+   - Query with Athena
+   - Advanced analytics
+
+### Filtering Options:
+
+```
+FILTER BY:
+- Namespace (AWS/EC2, AWS/RDS, etc.)
+- Metric name
+- Dimension values
+
+EXAMPLE:
+- Only stream EC2 CPUUtilization metrics
+- Only stream metrics for production instances
+- Exclude development environment metrics
+```
+
+### Real-Life Example:
+Think of Metric Streams as a LIVE NEWS FEED:
+
+```
+TRADITIONAL (Polling):                METRIC STREAMS:
+- Check CloudWatch periodically       - Live continuous feed
+- Delay in getting data               - Near real-time
+- Miss some data points               - Complete data
+- High API costs                      - Efficient delivery
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 4: CLOUDWATCH LOGS
+
+### Concept:
+CloudWatch Logs is a centralized logging service for collecting, storing, 
+and analyzing log data from AWS services and applications.
+
+### Key Components:
+
+1. LOG GROUPS
+   - Arbitrary name
+   - Usually representing an application
+   - Example: /aws/lambda/my-function
+   - Container for log streams
+
+2. LOG STREAMS
+   - Instances within application
+   - Log files / containers
+   - Example: Instance-specific logs
+
+3. LOG EXPIRATION POLICIES
+   - Can define log expiration policies
+   - Never expire
+   - 1 day to 10 years
+   - Control storage costs
+
+### Log Destinations:
+
+CloudWatch Logs can send logs to:
+
+✓ Amazon S3 (exports)
+✓ Kinesis Data Streams
+✓ Kinesis Data Firehose
+✓ AWS Lambda
+✓ OpenSearch
+
+### Security:
+
+1. ENCRYPTION BY DEFAULT
+   - Logs are encrypted by default
+   - AWS-managed encryption
+
+2. KMS ENCRYPTION
+   - Can setup KMS-based encryption
+   - Use your own keys
+   - Additional control
+
+### Architecture:
+
+```
+CLOUDWATCH LOGS STRUCTURE:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      CLOUDWATCH LOGS                            │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ LOG GROUP: /aws/lambda/my-function                        │  │
+│  │                                                           │  │
+│  │  ┌─────────────────────────────────────────────────────┐  │  │
+│  │  │ LOG STREAM: 2024/01/15/[$LATEST]abc123               │  │  │
+│  │  │   - Log event 1: "Function started"                  │  │  │
+│  │  │   - Log event 2: "Processing request..."             │  │  │
+│  │  │   - Log event 3: "Function completed"                │  │  │
+│  │  └─────────────────────────────────────────────────────┘  │  │
+│  │                                                           │  │
+│  │  ┌─────────────────────────────────────────────────────┐  │  │
+│  │  │ LOG STREAM: 2024/01/15/[$LATEST]def456               │  │  │
+│  │  │   - Log event 1: "Function started"                  │  │  │
+│  │  │   - Log event 2: "Error occurred!"                   │  │  │
+│  │  └─────────────────────────────────────────────────────┘  │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ LOG GROUP: /aws/ec2/my-instance                           │  │
+│  │   ... more log streams ...                                │  │
+│  └───────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Retention Periods:
+
+```
+RETENTION OPTIONS:
+- 1 day
+- 3 days
+- 5 days
+- 1 week
+- 2 weeks
+- 1 month
+- 2 months
+- 3 months
+- 6 months
+- 1 year
+- 13 months
+- 18 months
+- 2 years
+- 5 years
+- 10 years
+- Never expire (forever)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 5: CLOUDWATCH LOGS - SOURCES
+
+### Sources that can send logs to CloudWatch:
+
+1. SDK, CLOUDWATCH LOGS AGENT, CLOUDWATCH UNIFIED AGENT
+   - Programmatic access
+   - Agent-based collection
+   - Custom applications
+
+2. ELASTIC BEANSTALK
+   - Collection of logs from application
+   - Automatic configuration
+   - Application and web server logs
+
+3. ECS
+   - Collection from containers
+   - Container stdout/stderr
+   - Task-level logging
+
+4. AWS LAMBDA
+   - Collection from function logs
+   - Automatic for Lambda functions
+   - console.log(), print() statements
+
+5. VPC FLOW LOGS
+   - VPC specific logs
+   - Network traffic information
+   - Accept/reject decisions
+
+6. API GATEWAY
+   - API request/response logs
+   - Execution logs
+   - Access logs
+
+7. CLOUDTRAIL BASED ON FILTER
+   - API call logs
+   - Filtered to CloudWatch Logs
+   - Specific events
+
+8. ROUTE53
+   - Log DNS queries
+   - Query logging
+   - DNS resolution tracking
+
+### Architecture:
+
+```
+LOG SOURCES → CLOUDWATCH LOGS:
+
+┌────────────────┐
+│ SDK/Agent      │────────────┐
+└────────────────┘            │
+                              │
+┌────────────────┐            │
+│ Elastic        │────────────┤
+│ Beanstalk      │            │
+└────────────────┘            │
+                              │
+┌────────────────┐            │      ┌─────────────────────┐
+│ ECS            │────────────┼─────►│   CloudWatch Logs   │
+└────────────────┘            │      │                     │
+                              │      │  ┌───────────────┐  │
+┌────────────────┐            │      │  │  Log Groups   │  │
+│ Lambda         │────────────┤      │  └───────────────┘  │
+└────────────────┘            │      │                     │
+                              │      └─────────────────────┘
+┌────────────────┐            │
+│ VPC Flow Logs  │────────────┤
+└────────────────┘            │
+                              │
+┌────────────────┐            │
+│ API Gateway    │────────────┤
+└────────────────┘            │
+                              │
+┌────────────────┐            │
+│ CloudTrail     │────────────┤
+└────────────────┘            │
+                              │
+┌────────────────┐            │
+│ Route53        │────────────┘
+└────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 6 & 7: CLOUDWATCH LOGS INSIGHTS
+
+### Concept:
+CloudWatch Logs Insights allows you to search and analyze log data stored 
+in CloudWatch Logs using a purpose-built query language.
+
+### Key Features:
+
+1. SEARCH AND ANALYZE
+   - Search and analyze log data stored in CloudWatch Logs
+   - Find specific IP in logs
+   - Count occurrences of "ERROR"
+
+2. PURPOSE-BUILT QUERY LANGUAGE
+   - Automatically discovers fields from AWS services
+   - Discovers fields from JSON log events
+   - Easy to learn syntax
+
+3. QUERY CAPABILITIES
+   - Fetch desired event fields
+   - Filter based on conditions
+   - Calculate aggregate statistics
+   - Sort events
+   - Limit number of events
+
+4. SAVE AND REUSE
+   - Can save queries
+   - Add them to CloudWatch Dashboards
+   - Reuse common queries
+
+5. MULTI-ACCOUNT QUERIES
+   - Can query multiple Log Groups
+   - In different AWS accounts
+   - Centralized analysis
+
+6. IMPORTANT NOTE
+   - It's a QUERY engine, not a real-time engine
+   - Works on historical data
+   - Not for real-time streaming
+
+### Sample Queries:
+
+```
+# 25 most recently added log events
+fields @timestamp, @message
+| sort @timestamp desc
+| limit 25
+
+# Number of exceptions logged every 5 minutes
+filter @message like /Exception/
+| stats count(*) as exceptionCount by bin(5m)
+| sort exceptionCount desc
+
+# List of log events that are not exceptions
+fields @message
+| filter @message not like /Exception/
+
+# Find specific IP address
+fields @timestamp, @message
+| filter @message like /192.168.1.100/
+| sort @timestamp desc
+
+# Count ERROR occurrences
+filter @message like /ERROR/
+| stats count(*) as errorCount
+```
+
+### UI Features (from screenshot):
+
+```
+LOGS INSIGHTS INTERFACE:
+
+┌─────────────────────────────────────────────────────────────────┐
+│  Select log group(s): [application.log ×]  [Clear]             │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Write your query here:                                         │
+│  ┌───────────────────────────────────────────────────────────┐  │
+│  │ 1  fields @timestamp, @message                            │  │
+│  │ 2    | sort @timestamp desc                               │  │
+│  │ 3    | limit 20                                           │  │
+│  └───────────────────────────────────────────────────────────┘  │
+│                                                                 │
+│  [Run query]  [Save]  [History]                                 │
+│                                                                 │
+├─────────────────────────────────────────────────────────────────┤
+│  [Logs]  [Visualization]     [Export results ▼] [Add to dash]  │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  Showing 20 of 10,197 records matched                          │
+│  10,197 records (2.3 MB) scanned in 3.3s                       │
+│                                                                 │
+│  [Histogram visualization showing log distribution over time]   │
+│                                                                 │
+│  Results:                                                       │
+│  @timestamp              @message                               │
+│  2021-11-09T06:54:17...  {"Severity": "INFO", "message":...}   │
+│  2021-11-09T06:54:13...  {"Severity": "INFO", "message":...}   │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 8: CLOUDWATCH LOGS – S3 EXPORT
+
+### Concept:
+You can export CloudWatch Logs to S3 for long-term storage and analysis.
+
+### Key Points:
+
+1. EXPORT DELAY
+   - Log data can take UP TO 12 HOURS to become available for export
+   - Not immediate
+   - Batch process
+
+2. API CALL
+   - The API call is: CreateExportTask
+   - Programmatic export
+   - Can be automated
+
+3. NOT REAL-TIME
+   - Not near-real time or real-time
+   - Use Logs Subscriptions instead for real-time
+   - S3 export is for batch/archive
+
+### Architecture:
+
+```
+S3 EXPORT FLOW:
+
+┌─────────────────────┐         ┌─────────────────────┐
+│  CloudWatch Logs    │         │     Amazon S3       │
+│                     │         │                     │
+│  ┌───────────────┐  │         │  ┌───────────────┐  │
+│  │  Log Group    │  │ Export  │  │   Bucket      │  │
+│  │               │──┼────────►│  │               │  │
+│  │  (12 hr delay)│  │         │  │  /logs/       │  │
+│  └───────────────┘  │         │  └───────────────┘  │
+│                     │         │                     │
+└─────────────────────┘         └─────────────────────┘
+
+⚠️ Takes up to 12 hours!
+⚠️ NOT real-time - use Subscriptions for real-time
+```
+
+### When to Use S3 Export vs Subscriptions:
+
+```
+S3 EXPORT:                           SUBSCRIPTIONS:
+─────────────────────────────────────────────────────────────
+- Batch/historical export           - Real-time streaming
+- Up to 12 hour delay               - Near real-time
+- CreateExportTask API              - Continuous
+- Long-term archival                - Live processing
+- Cost-effective storage            - Lambda, Kinesis, etc.
+- Athena analysis                   - Immediate alerts
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 9: CLOUDWATCH LOGS SUBSCRIPTIONS
+
+### Concept:
+CloudWatch Logs Subscriptions allow you to get real-time log events from 
+CloudWatch Logs for processing and analysis.
+
+### Key Features:
+
+1. REAL-TIME LOG EVENTS
+   - Get real-time log events from CloudWatch Logs
+   - For processing and analysis
+   - Continuous streaming
+
+2. DESTINATIONS
+   - Send to Kinesis Data Streams
+   - Send to Kinesis Data Firehose
+   - Send to Lambda
+
+3. SUBSCRIPTION FILTER
+   - Filter which logs are delivered to your destination
+   - Only send matching events
+   - Reduce noise and costs
+
+### Architecture:
+
+```
+CLOUDWATCH LOGS SUBSCRIPTIONS:
+
+                                    ┌──────────────┐   real-time   ┌───────────┐
+                                    │   Lambda     │──────────────►│OpenSearch │
+                              ┌────►│              │               │ Service   │
+                              │     └──────────────┘               └───────────┘
+                              │
+┌─────────────┐    logs    ┌──┴───────────────┐   near      ┌───────────────────┐
+│ CloudWatch  │───────────►│  Subscription    │  real-time  │ Kinesis Data      │
+│ Logs        │            │  Filter          │─────────────►│ Firehose          │
+└─────────────┘            └──┬───────────────┘             └─────────┬─────────┘
+                              │                                       │
+                              │     ┌──────────────────┐              ▼
+                              │     │ Kinesis Data     │         ┌─────────┐
+                              └────►│ Streams          │         │   S3    │
+                                    └──────────┬───────┘         └─────────┘
+                                               │
+                              ┌────────────────┼────────────────┐
+                              │                │                │
+                              ▼                ▼                ▼
+                          ┌──────┐        ┌───────┐        ┌────────┐
+                          │ KDF  │        │  KDA  │        │ Lambda │
+                          └──────┘        └───────┘        └────────┘
+```
+
+### Subscription Filter Syntax:
+
+```
+FILTER PATTERNS:
+
+Match "ERROR":
+ERROR
+
+Match "ERROR" or "Exception":
+?ERROR ?Exception
+
+Match JSON field:
+{ $.level = "ERROR" }
+
+Match IP address:
+192.168.1.100
+
+Exclude pattern (use in combination):
+-ERROR (negate)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 10: CLOUDWATCH LOGS AGGREGATION - MULTI-ACCOUNT & MULTI-REGION
+
+### Concept:
+You can aggregate logs from multiple AWS accounts and regions into a 
+centralized location using Subscription Filters and Kinesis.
+
+### Architecture:
+
+```
+MULTI-ACCOUNT & MULTI-REGION AGGREGATION:
+
+ACCOUNT A                                              
+REGION 1                                               
+┌────────────────┐      ┌────────────────┐            
+│ CloudWatch     │─────►│ Subscription   │            
+│ Logs           │      │ Filter         │──────┐     
+└────────────────┘      └────────────────┘      │     
+                                                │     
+ACCOUNT B                                       │     
+REGION 2                                        │     
+┌────────────────┐      ┌────────────────┐      │     ┌─────────────────┐
+│ CloudWatch     │─────►│ Subscription   │──────┼────►│ Kinesis Data    │
+│ Logs           │      │ Filter         │      │     │ Streams         │
+└────────────────┘      └────────────────┘      │     └────────┬────────┘
+                                                │              │
+ACCOUNT B                                       │              │
+REGION 3                                        │              │ Near
+┌────────────────┐      ┌────────────────┐      │              │ Real
+│ CloudWatch     │─────►│ Subscription   │──────┘              │ Time
+│ Logs           │      │ Filter         │                     ▼
+└────────────────┘      └────────────────┘            ┌─────────────────┐
+                                                      │ Kinesis Data    │
+                                                      │ Firehose        │
+                                                      └────────┬────────┘
+                                                               │
+                                                               ▼
+                                                      ┌─────────────────┐
+                                                      │   Amazon S3     │
+                                                      │ (Central Store) │
+                                                      └─────────────────┘
+```
+
+### Benefits:
+
+✓ CENTRALIZED LOGGING: All logs in one place
+✓ CROSS-ACCOUNT VISIBILITY: See logs from all accounts
+✓ CROSS-REGION ANALYSIS: Analyze logs from all regions
+✓ COMPLIANCE: Meet audit requirements
+✓ TROUBLESHOOTING: Correlate events across systems
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 11: CLOUDWATCH LOGS SUBSCRIPTIONS - CROSS-ACCOUNT
+
+### Concept:
+Cross-Account Subscription allows you to send log events to resources in a 
+different AWS account (KDS, KDF).
+
+### Requirements:
+
+1. SENDER ACCOUNT
+   - CloudWatch Logs
+   - Subscription Filter
+   - IAM Role that can be assumed
+
+2. RECIPIENT ACCOUNT
+   - Subscription Destination
+   - Destination Access Policy
+   - Kinesis Data Streams
+
+3. IAM CONFIGURATION
+   - IAM Role (Cross-Account) to allow PutRecord
+   - Destination Access Policy to allow PutSubscriptionFilter
+
+### Architecture:
+
+```
+CROSS-ACCOUNT SUBSCRIPTION:
+
+ACCOUNT - SENDER                    ACCOUNT - RECIPIENT
+(111111111111)                      (999999999999)
+                                    
+┌─────────────┐                     
+│ CloudWatch  │                     
+│ Logs        │                     
+└──────┬──────┘                     
+       │ logs                       
+       ▼                            
+┌─────────────┐      logs      ┌──────────────┐     ┌─────────────────────┐
+│Subscription │───────────────►│ Subscription │────►│ Kinesis Data        │
+│Filter       │                │ Destination  │     │ Streams             │
+└─────────────┘                └──────┬───────┘     │ (RecipientStream)   │
+       │                              │             └─────────────────────┘
+       │ Can be assumed               │
+       └──────────────────────►┌──────┴───────┐
+                               │   IAM Role   │──── allow PutRecord
+                               └──────────────┘
+```
+
+### IAM Role Policy (Cross-Account):
+
+```json
+{
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "kinesis:PutRecord",
+      "Resource": "arn:aws:kinesis:us-east-1:
+                   999999999999:stream/RecipientStream"
+    }
+  ]
+}
+```
+
+### Destination Access Policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "111111111111"
+      },
+      "Action": "logs:PutSubscriptionFilter",
+      "Resource": "arn:aws:logs:us-east-1:999999999999:
+                   destination:testDestination"
+    }
+  ]
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 12: CLOUDWATCH LOGS FOR EC2
+
+### Concept:
+By default, no logs from your EC2 machine will go to CloudWatch. You need 
+to run a CloudWatch agent on EC2 to push log files.
+
+### Key Points:
+
+1. NO LOGS BY DEFAULT
+   - By default, no logs from EC2 go to CloudWatch
+   - Must explicitly configure
+   - Install agent
+
+2. CLOUDWATCH AGENT REQUIRED
+   - You need to run a CloudWatch agent on EC2
+   - Push the log files you want
+   - Select which logs to send
+
+3. IAM PERMISSIONS
+   - Make sure IAM permissions are correct
+   - EC2 instance role needs CloudWatch Logs permissions
+   - logs:PutLogEvents, logs:CreateLogGroup, etc.
+
+4. ON-PREMISES SUPPORT
+   - The CloudWatch log agent can be setup on-premises too
+   - Hybrid logging
+   - Same agent, different location
+
+### Architecture:
+
+```
+CLOUDWATCH LOGS FOR EC2:
+
+                          ┌─────────────────────────┐
+                          │     CloudWatch Logs     │
+                          │                         │
+                          │  ┌───────────────────┐  │
+                          │  │   Log Groups      │  │
+                          │  │   /var/log/...    │  │
+                          │  └───────────────────┘  │
+                          └───────────▲─────────────┘
+                                      │
+                                      │ push logs
+                                      │
+        ┌─────────────────────────────┴─────────────────────────────┐
+        │                                                           │
+┌───────┴─────────────────────┐           ┌────────────────────────┴───────┐
+│        EC2 Instance         │           │       On Premise Server        │
+│                             │           │                                │
+│  ┌───────────────────────┐  │           │  ┌───────────────────────────┐ │
+│  │ CloudWatch Logs Agent │  │           │  │  CloudWatch Logs Agent    │ │
+│  └───────────────────────┘  │           │  └───────────────────────────┘ │
+│                             │           │                                │
+└─────────────────────────────┘           └────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 13: CLOUDWATCH LOGS AGENT & UNIFIED AGENT
+
+### For virtual servers (EC2 instances, on-premises servers...)
+
+### CloudWatch Logs Agent (OLD):
+
+- Old version of the agent
+- Can ONLY send to CloudWatch Logs
+- Limited functionality
+- Being replaced by Unified Agent
+
+### CloudWatch Unified Agent (NEW - RECOMMENDED):
+
+1. ADDITIONAL SYSTEM-LEVEL METRICS
+   - Collect additional system-level metrics
+   - RAM, processes, etc.
+   - Not available from standard EC2 metrics
+
+2. COLLECT LOGS
+   - Collect logs to send to CloudWatch Logs
+   - Same functionality as old agent
+   - Plus metrics!
+
+3. CENTRALIZED CONFIGURATION
+   - Centralized configuration using SSM Parameter Store
+   - Store config in Parameter Store
+   - Easier management across fleet
+
+### Comparison:
+
+```
+FEATURE                 LOGS AGENT        UNIFIED AGENT
+─────────────────────────────────────────────────────────────
+Send Logs               ✓                 ✓
+Collect Metrics         ✗                 ✓
+RAM metrics             ✗                 ✓
+Disk metrics            ✗                 ✓
+Processes               ✗                 ✓
+SSM Integration         ✗                 ✓
+Recommended             ✗                 ✓
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 14: CLOUDWATCH UNIFIED AGENT – METRICS
+
+### Metrics collected directly on your Linux server / EC2 instance:
+
+### Available Metrics:
+
+1. CPU
+   - active, guest, idle
+   - system, user, steal
+   - Detailed CPU breakdown
+
+2. DISK METRICS
+   - free, used, total
+   - Disk IO: writes, reads, bytes, iops
+   - Per-mount metrics
+
+3. RAM
+   - free, inactive, used
+   - total, cached
+   - Memory utilization
+
+4. NETSTAT
+   - Number of TCP and UDP connections
+   - Net packets, bytes
+   - Network statistics
+
+5. PROCESSES
+   - total, dead, blocked
+   - idle, running, sleep
+   - Process states
+
+6. SWAP SPACE
+   - free, used
+   - used %
+   - Swap utilization
+
+### Important Reminder:
+
+```
+OUT-OF-THE-BOX EC2 METRICS (standard, no agent):
+─────────────────────────────────────────────────
+- Disk (high level)
+- CPU (high level)
+- Network (high level)
+- Status checks
+
+WITH UNIFIED AGENT (detailed):
+─────────────────────────────────────────────────
+- All the above PLUS:
+- RAM / Memory (not available without agent!)
+- Swap Space
+- Detailed Disk IO
+- Per-process metrics
+- Netstat details
+```
+
+### Why RAM Is Not Default?
+
+```
+EC2 hypervisor can see:
+- CPU usage (shared with hypervisor)
+- Network (virtual NIC)
+- Disk (EBS volumes)
+
+EC2 hypervisor CANNOT see:
+- What's happening INSIDE the VM
+- RAM usage (inside VM)
+- Processes (inside VM)
+- Swap (inside VM)
+
+→ Need agent INSIDE VM to report these!
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 15: CLOUDWATCH ALARMS
+
+### Concept:
+CloudWatch Alarms are used to trigger notifications for any metric based 
+on threshold conditions.
+
+### Key Features:
+
+1. TRIGGER NOTIFICATIONS
+   - Alarms are used to trigger notifications for any metric
+   - Based on conditions you define
+   - Automated responses
+
+2. VARIOUS OPTIONS
+   - Sampling
+   - Percentage (%)
+   - Max, Min
+   - And more comparison operators
+
+3. ALARM STATES
+   - OK: Metric is within threshold
+   - INSUFFICIENT_DATA: Not enough data to determine
+   - ALARM: Metric breached threshold
+
+4. PERIOD
+   - Length of time in seconds to evaluate the metric
+   - How often to check
+   - High resolution custom metrics: 10 sec, 30 sec, or multiples of 60 sec
+
+### Alarm Configuration:
+
+```
+ALARM COMPONENTS:
+
+┌─────────────────────────────────────────────────────────────┐
+│                    CLOUDWATCH ALARM                         │
+├─────────────────────────────────────────────────────────────┤
+│  Metric:        CPUUtilization                              │
+│  Statistic:     Average                                     │
+│  Period:        300 seconds (5 minutes)                     │
+│  Threshold:     > 80%                                       │
+│  Datapoints:    3 out of 5                                  │
+│  Actions:       Send to SNS topic                           │
+├─────────────────────────────────────────────────────────────┤
+│  Current State: [OK]                                        │
+│                                                             │
+│  If CPUUtilization > 80% for 3/5 periods → ALARM            │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Alarm State Transitions:
+
+```
+                    ┌──────────────────┐
+                    │ INSUFFICIENT_DATA│
+                    │  (not enough     │
+                    │   data yet)      │
+                    └────────┬─────────┘
+                             │
+            ┌────────────────┴────────────────┐
+            │                                 │
+            ▼                                 ▼
+    ┌───────────────┐                 ┌───────────────┐
+    │      OK       │◄───────────────►│     ALARM     │
+    │  (within      │                 │  (threshold   │
+    │  threshold)   │                 │   breached)   │
+    └───────────────┘                 └───────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 16: CLOUDWATCH ALARM TARGETS
+
+### What can alarms trigger?
+
+1. AMAZON EC2 ACTIONS
+   - Stop an EC2 Instance
+   - Terminate an EC2 Instance
+   - Reboot an EC2 Instance
+   - Recover an EC2 Instance
+
+2. EC2 AUTO SCALING
+   - Trigger Auto Scaling Action
+   - Scale out (add instances)
+   - Scale in (remove instances)
+
+3. AMAZON SNS
+   - Send notification to SNS
+   - From SNS, you can do pretty much anything!
+   - Email, SMS, Lambda, SQS, etc.
+
+### Architecture:
+
+```
+CLOUDWATCH ALARM TARGETS:
+
+                          ┌─────────────────────────────────────┐
+                          │         CloudWatch Alarm            │
+                          │                                     │
+                          │  When CPUUtilization > 80%          │
+                          └──────────────┬──────────────────────┘
+                                         │
+              ┌──────────────────────────┼──────────────────────────┐
+              │                          │                          │
+              ▼                          ▼                          ▼
+      ┌───────────────┐          ┌───────────────┐          ┌───────────────┐
+      │  Amazon EC2   │          │ EC2 Auto      │          │  Amazon SNS   │
+      │               │          │ Scaling       │          │               │
+      │ - Stop        │          │               │          │ - Email       │
+      │ - Terminate   │          │ - Scale out   │          │ - SMS         │
+      │ - Reboot      │          │ - Scale in    │          │ - Lambda      │
+      │ - Recover     │          │               │          │ - SQS         │
+      └───────────────┘          └───────────────┘          │ - HTTP        │
+                                                            └───────────────┘
+```
+
+### Common Patterns:
+
+```
+PATTERN 1: Auto Scaling
+Alarm → Auto Scaling → Add/Remove EC2 instances
+
+PATTERN 2: Notification
+Alarm → SNS → Email to ops team
+
+PATTERN 3: Automated Response
+Alarm → SNS → Lambda → Custom remediation
+
+PATTERN 4: Instance Recovery
+Alarm → EC2 Recover action → Instance recovered
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 17: CLOUDWATCH ALARMS – COMPOSITE ALARMS
+
+### Concept:
+Composite Alarms monitor the states of multiple other alarms to create 
+complex alerting logic.
+
+### Key Features:
+
+1. SINGLE METRIC ALARMS
+   - CloudWatch Alarms are on a single metric
+   - One alarm per metric
+   - Simple threshold
+
+2. COMPOSITE ALARMS
+   - Monitoring the states of multiple other alarms
+   - Combine multiple alarms
+   - Complex conditions
+
+3. AND AND OR CONDITIONS
+   - Use AND and OR conditions
+   - "Alarm A AND Alarm B"
+   - "Alarm A OR Alarm B"
+
+4. REDUCE ALARM NOISE
+   - Helpful to reduce "alarm noise"
+   - Create complex composite alarms
+   - Only alert when multiple conditions met
+
+### Architecture:
+
+```
+COMPOSITE ALARM EXAMPLE:
+
+┌─────────────────────────────────────────────────────────────────┐
+│                      Composite Alarm                            │
+│                                                                 │
+│                      ┌────────────────┐                         │
+│    monitor CPU       │  CW Alarm - A  │──── ALARM! ────┐        │
+│    ┌───────────────► │  (CPU > 80%)   │                │        │
+│    │                 └────────────────┘                │        │
+│    │                                                   ▼        │
+│ ┌──┴──────────┐                              ┌─────────────────┐│
+│ │ EC2 Instance│                              │ Composite Alarm ││
+│ └──┬──────────┘                              │                 ││
+│    │                                         │ IF (A AND B)    ││──► SNS
+│    │                 ┌────────────────┐      │   THEN ALERT    ││
+│    │  monitor IOPS   │  CW Alarm - B  │      │                 ││
+│    └───────────────► │  (IOPS > 5000) │      └─────────────────┘│
+│                      └────────────────┘                │        │
+│                             │                          │        │
+│                             └────── ALARM! ────────────┘        │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+Result: Only trigger SNS when BOTH CPU AND IOPS are in ALARM state
+```
+
+### Use Cases:
+
+```
+REDUCE FALSE POSITIVES:
+- Don't alert if only CPU is high
+- Alert only if CPU high AND memory high
+- More reliable alerting
+
+COMPLEX SCENARIOS:
+- (CPU high OR Memory high) AND (Disk low)
+- Multiple conditions must be true
+- Business logic in alerting
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 18: EC2 INSTANCE RECOVERY
+
+### Status Checks:
+
+1. INSTANCE STATUS
+   - Check the EC2 VM
+   - Software issues
+   - OS-level problems
+
+2. SYSTEM STATUS
+   - Check the underlying hardware
+   - AWS infrastructure issues
+   - Physical host problems
+
+3. ATTACHED EBS STATUS
+   - Check attached EBS volumes
+   - Volume health
+   - Storage issues
+
+### Recovery Architecture:
+
+```
+EC2 INSTANCE RECOVERY:
+
+┌──────────────┐      monitor      ┌─────────────────────────────┐
+│              │──────────────────►│      CloudWatch Alarm       │
+│     M5       │                   │                             │
+│  ┌────────┐  │                   │  StatusCheckFailed_System   │
+│  │   EC2  │  │                   │                             │
+│  │Instance│  │                   └───────────────┬─────────────┘
+│  └────────┘  │                                   │
+│              │◄──────────────────────────────────┤
+└──────────────┘   EC2 Instance Recovery           │
+                                                   │ alert
+                                                   ▼
+                                           ┌───────────────┐
+                                           │   SNS Topic   │
+                                           └───────────────┘
+```
+
+### What's Preserved in Recovery:
+
+✓ Same Private IP address
+✓ Same Public IP address
+✓ Same Elastic IP
+✓ Same metadata
+✓ Same placement group
+
+### How Recovery Works:
+
+```
+1. System status check fails
+2. CloudWatch Alarm triggers
+3. EC2 Recovery action initiated
+4. Instance moved to healthy hardware
+5. Instance restarts with same configuration
+6. SNS notification sent
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 19: CLOUDWATCH ALARM - GOOD TO KNOW
+
+### Alarms from Metric Filters:
+
+Alarms can be created based on CloudWatch Logs Metrics Filters.
+
+```
+METRIC FILTER → ALARM FLOW:
+
+┌─────────────┐    ┌─────────────────────────────────────────────────┐
+│             │    │               CloudWatch                         │
+│ CW Logs     │    │                                                  │
+│             │    │   ┌──────────────┐                               │
+│  ┌───────┐  │    │   │ Metric       │                               │
+│  │ Logs  │──┼────┼──►│ Filter       │──────────────┐                │
+│  └───────┘  │    │   │              │              │                │
+│             │    │   │ (count ERROR)│              ▼                │
+└─────────────┘    │   └──────────────┘      ┌──────────────┐         │
+                   │                         │  CW Alarm    │         │
+                   │                         │              │──► Alert│
+                   │                         │ (errors > 5) │         │
+                   │                         └──────────────┘         │
+                   │                                │                 │
+                   └────────────────────────────────┼─────────────────┘
+                                                    ▼
+                                            ┌───────────────┐
+                                            │  Amazon SNS   │
+                                            └───────────────┘
+```
+
+### Testing Alarms:
+
+To test alarms and notifications, set the alarm state to Alarm using CLI:
+
+```bash
+aws cloudwatch set-alarm-state \
+  --alarm-name "myalarm" \
+  --state-value ALARM \
+  --state-reason "testing purposes"
+```
+
+This allows you to:
+- Test alarm notifications
+- Verify SNS topic configuration
+- Check Lambda triggers
+- Validate escalation procedures
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 20: AMAZON EVENTBRIDGE (FORMERLY CLOUDWATCH EVENTS)
+
+### Concept:
+Amazon EventBridge is a serverless event bus service that makes it easy to 
+connect applications with data from various sources.
+
+### Two Main Use Cases:
+
+1. SCHEDULE (CRON JOBS)
+   - Scheduled scripts
+   - Run at specific times
+   - Example: "Schedule Every hour" → Trigger Lambda
+
+2. EVENT PATTERN
+   - React to a service doing something
+   - Event-driven automation
+   - Example: "IAM Root User Sign in Event" → SNS Email Notification
+
+### What Can Be Triggered:
+
+✓ Trigger Lambda functions
+✓ Send SQS/SNS messages
+✓ Start Step Functions
+✓ And much more!
+
+### Architecture:
+
+```
+EVENTBRIDGE USE CASES:
+
+SCHEDULE (CRON):
+┌─────────────────────┐                    ┌─────────────────┐
+│   Schedule          │                    │                 │
+│   Every hour        │───────────────────►│     Lambda      │
+│   ┌───────┐         │    trigger         │                 │
+│   │ Event │         │                    └─────────────────┘
+│   │ Bridge│         │
+│   └───────┘         │
+└─────────────────────┘
+
+
+EVENT PATTERN:
+┌─────────────────────┐                    ┌─────────────────┐
+│ IAM Root User       │                    │                 │
+│ Sign in Event       │───────────────────►│   SNS Topic     │
+│   ┌───────┐         │    trigger         │ (Email Alert)   │
+│   │ Event │         │                    │                 │
+│   │ Bridge│         │                    └─────────────────┘
+│   └───────┘         │
+└─────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 21: AMAZON EVENTBRIDGE RULES
+
+### Concept:
+EventBridge Rules filter events and route them to appropriate targets 
+based on patterns.
+
+### Example Sources:
+
+- EC2 Instance (ex: Start Instance)
+- CodeBuild (ex: failed build)
+- S3 Event (ex: upload object)
+- Trusted Advisor (ex: new Finding)
+- CloudTrail (any API call)
+- Schedule or Cron (ex: every 4 hours)
+
+### Event Format (JSON):
+
+```json
+{
+  "version": "0",
+  "id": "6a7e8feb-b491...",
+  "detail-type": "EC2 Instance State-change Notification",
+  ...
+}
+```
+
+### Example Destinations:
+
+COMPUTE:
+- Lambda
+- AWS Batch
+- ECS Task
+
+INTEGRATION:
+- SQS
+- SNS
+- Kinesis Data Streams
+
+ORCHESTRATION:
+- Step Functions
+- CodePipeline
+- CodeBuild
+
+MAINTENANCE:
+- SSM
+- EC2 Actions
+
+### Architecture:
+
+```
+EVENTBRIDGE RULES FLOW:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   EXAMPLE SOURCES              EVENTBRIDGE              EXAMPLE DESTINATIONS│
+│                                                                             │
+│  ┌──────────────┐                                      ┌─────────────────┐  │
+│  │ EC2 Instance │──┐                                ┌──│ Lambda          │  │
+│  └──────────────┘  │                                │  └─────────────────┘  │
+│                    │                                │                       │
+│  ┌──────────────┐  │         ┌──────────┐           │  ┌─────────────────┐  │
+│  │ CodeBuild    │──┤         │          │           ├──│ AWS Batch       │  │
+│  └──────────────┘  │         │  Filter  │           │  └─────────────────┘  │
+│                    │ ───────►│  events  │───────────┤                       │
+│  ┌──────────────┐  │ JSON    │(optional)│           │  ┌─────────────────┐  │
+│  │ S3 Event     │──┤         │          │           ├──│ SQS / SNS       │  │
+│  └──────────────┘  │         └──────────┘           │  └─────────────────┘  │
+│                    │              │                 │                       │
+│  ┌──────────────┐  │              │                 │  ┌─────────────────┐  │
+│  │ CloudTrail   │──┤         EventBridge            ├──│ Step Functions  │  │
+│  └──────────────┘  │                                │  └─────────────────┘  │
+│                    │                                │                       │
+│  ┌──────────────┐  │                                │  ┌─────────────────┐  │
+│  │ Schedule     │──┘                                └──│ SSM / EC2       │  │
+│  └──────────────┘                                      └─────────────────┘  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+Continue to Part 2 for:
+- EventBridge Event Buses, Schema Registry, Resource-based Policies
+- CloudWatch Insights (Container, Lambda, Contributor, Application)
+- AWS CloudTrail (Events, Insights, Retention)
+- AWS Config (Rules, Remediations, Notifications)
+- CloudWatch vs CloudTrail vs Config comparison
+
+═══════════════════════════════════════════════════════════════════════════════
+# AWS MONITORING, AUDIT AND PERFORMANCE - COMPLETE GUIDE (PART 2)
+## EventBridge Advanced, CloudWatch Insights, CloudTrail & AWS Config
+
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 2
+═══════════════════════════════════════════════════════════════════════════════
+
+21. Amazon EventBridge Event Buses
+22. Amazon EventBridge – Schema Registry
+23. Amazon EventBridge – Resource-based Policy
+24. CloudWatch Container Insights
+25. CloudWatch Lambda Insights
+26. CloudWatch Contributor Insights
+27. CloudWatch Application Insights
+28. CloudWatch Insights and Operational Visibility (Summary)
+29. AWS CloudTrail
+30. CloudTrail Diagram
+31. CloudTrail Events
+32. CloudTrail Insights
+33. CloudTrail Events Retention
+34. Amazon EventBridge – Intercept API Calls
+35. Amazon EventBridge + CloudTrail
+36. AWS Config
+37. Config Rules
+38. AWS Config Resource
+39. Config Rules – Remediations
+40. Config Rules – Notifications
+41. CloudWatch vs CloudTrail vs Config
+42. For an Elastic Load Balancer (Example)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 22: AMAZON EVENTBRIDGE - EVENT BUSES
+
+### Types of Event Buses:
+
+1. DEFAULT EVENT BUS
+   - AWS Services
+   - Receives events from AWS services
+   - CodePipeline, Lambda, S3, etc.
+
+2. PARTNER EVENT BUS
+   - AWS SaaS Partners
+   - Zendesk, Datadog, etc.
+   - Third-party integrations
+
+3. CUSTOM EVENT BUS
+   - Custom Apps
+   - Your own applications
+   - Your own events
+
+### Key Features:
+
+1. CROSS-ACCOUNT ACCESS
+   - Event buses can be accessed by other AWS accounts
+   - Using Resource-based Policies
+   - Centralized event handling
+
+2. ARCHIVE EVENTS
+   - You can archive events (all or filtered)
+   - Sent to an event bus
+   - Indefinitely or set period
+
+3. REPLAY ARCHIVED EVENTS
+   - Ability to replay archived events
+   - Useful for debugging
+   - Recover from failures
+
+### Architecture:
+
+```
+EVENTBRIDGE EVENT BUSES:
+
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│   AWS Services  │     │ AWS SaaS        │     │   Custom Apps   │
+│                 │     │ Partners        │     │                 │
+│ ┌─────────────┐ │     │ ┌─────────────┐ │     │ ┌─────────────┐ │
+│ │ CodePipeline│ │     │ │   Zendesk   │ │     │ │  Your App   │ │
+│ └─────────────┘ │     │ └─────────────┘ │     │ └─────────────┘ │
+│ ┌─────────────┐ │     │ ┌─────────────┐ │     └────────┬────────┘
+│ │   Lambda    │ │     │ │  Datadog    │ │              │
+│ └─────────────┘ │     │ └─────────────┘ │              │
+│ ┌─────────────┐ │     └────────┬────────┘              │
+│ │     S3      │ │              │                       │
+│ └─────────────┘ │              │                       │
+└────────┬────────┘              │                       │
+         │                       │                       │
+         ▼                       ▼                       ▼
+   ┌───────────┐          ┌───────────┐          ┌───────────┐
+   │  Default  │          │  Partner  │          │  Custom   │
+   │Event Bus  │          │Event Bus  │          │Event Bus  │
+   └───────────┘          └───────────┘          └───────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 23: AMAZON EVENTBRIDGE – SCHEMA REGISTRY
+
+### Concept:
+EventBridge can analyze the events in your bus and infer the schema 
+automatically.
+
+### Key Features:
+
+1. SCHEMA INFERENCE
+   - EventBridge can analyze the events in your bus
+   - Infer the schema automatically
+   - Understand event structure
+
+2. SCHEMA REGISTRY
+   - The Schema Registry allows you to generate code
+   - For your application
+   - Will know in advance how data is structured in the event bus
+
+3. SCHEMA VERSIONING
+   - Schema can be versioned
+   - Track changes over time
+   - Maintain compatibility
+
+### Example Schema:
+
+```
+Schema details:
+─────────────────────────────────────────────────
+Schema name:    aws.codepipeline@CodePipelineAction
+                ExecutionStateChange
+
+Last modified:  Dec 1, 2019, 12:11 AM GMT
+
+Schema registry: aws.events
+
+Number of versions: 1
+
+Schema type:    OpenAPI 3.0
+
+Description:    Schema for event type
+                CodePipelineActionExecutionStateChange,
+                published by AWS service aws.codepipeline
+```
+
+### Benefits:
+
+```
+WITHOUT SCHEMA REGISTRY:
+- Guess event structure
+- Parse events manually
+- Errors at runtime
+- No IDE support
+
+WITH SCHEMA REGISTRY:
+- Know event structure
+- Generated type-safe code
+- Compile-time validation
+- IDE autocomplete
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 24: AMAZON EVENTBRIDGE – RESOURCE-BASED POLICY
+
+### Concept:
+Resource-based policies allow you to manage permissions for a specific 
+Event Bus.
+
+### Key Features:
+
+1. MANAGE PERMISSIONS
+   - Manage permissions for a specific Event Bus
+   - Control who can send events
+   - Control who can receive events
+
+2. CROSS-ACCOUNT/REGION
+   - Allow/deny events from another AWS account
+   - Allow/deny events from another AWS region
+   - Flexible access control
+
+3. USE CASE
+   - Aggregate all events from your AWS Organization
+   - In a single AWS account
+   - Or AWS region
+
+### Architecture:
+
+```
+CROSS-ACCOUNT EVENTBRIDGE:
+
+AWS Account (123456789012)              AWS Account (111122223333)
+─────────────────────────              ─────────────────────────
+
+┌─────────────────────────┐            ┌─────────────────────────┐
+│    EventBridge Bus      │            │                         │
+│   (central-event-bus)   │◄───────────│    Lambda function      │
+│                         │ PutEvents  │                         │
+│  Resource-based Policy: │            │    (sends events to     │
+│  Allow 111122223333     │            │     central bus)        │
+│  to PutEvents           │            │                         │
+└─────────────────────────┘            └─────────────────────────┘
+```
+
+### Example Policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "events:PutEvents",
+      "Principal": { "AWS": "111122223333" },
+      "Resource": "arn:aws:events:us-east-1:123456789012:
+                   event-bus/central-event-bus"
+    }
+  ]
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 25: CLOUDWATCH CONTAINER INSIGHTS
+
+### Concept:
+CloudWatch Container Insights collects, aggregates, and summarizes metrics 
+and logs from containers.
+
+### Key Features:
+
+1. COLLECT METRICS AND LOGS
+   - Collect, aggregate, summarize metrics and logs
+   - From containers
+   - Comprehensive visibility
+
+2. AVAILABLE FOR CONTAINERS ON:
+   - Amazon Elastic Container Service (Amazon ECS)
+   - Amazon Elastic Kubernetes Services (Amazon EKS)
+   - Kubernetes platforms on EC2
+   - Fargate (both for ECS and EKS)
+
+3. CONTAINERIZED AGENT FOR EKS/K8s
+   - In Amazon EKS and Kubernetes
+   - CloudWatch Insights uses a containerized version of CloudWatch Agent
+   - To discover containers
+
+### Metrics Available:
+
+```
+CONTAINER INSIGHTS DASHBOARD:
+─────────────────────────────
+- CPU Utilization
+- Memory Utilization  
+- Network TX/RX
+- Number of Running Tasks
+- Number of Pending Tasks
+- Number of Desired Tasks
+- Task Sets
+- Container Deployments
+```
+
+### Architecture:
+
+```
+CONTAINER INSIGHTS:
+
+┌─────────────────┐    ┌─────────────────┐
+│ ECS Container   │    │ EKS Container   │
+│    ┌──────┐     │    │    ┌──────┐     │
+│    │ App  │     │    │    │ App  │     │
+│    └──────┘     │    │    └──────┘     │
+└────────┬────────┘    └────────┬────────┘
+         │                      │
+         │ Metrics and logs     │
+         └──────────┬───────────┘
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │    CloudWatch       │
+         │ Container Insights  │
+         │                     │
+         │  ┌───────────────┐  │
+         │  │ Dashboard     │  │
+         │  │ - CPU         │  │
+         │  │ - Memory      │  │
+         │  │ - Network     │  │
+         │  └───────────────┘  │
+         └─────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 26: CLOUDWATCH LAMBDA INSIGHTS
+
+### Concept:
+CloudWatch Lambda Insights is a monitoring and troubleshooting solution 
+for serverless applications running on AWS Lambda.
+
+### Key Features:
+
+1. MONITORING AND TROUBLESHOOTING
+   - Solution for serverless applications
+   - Running on AWS Lambda
+   - Detailed visibility
+
+2. SYSTEM-LEVEL METRICS
+   - Collects, aggregates, and summarizes
+   - CPU time, memory, disk, and network
+   - Performance metrics
+
+3. DIAGNOSTIC INFORMATION
+   - Collects, aggregates, and summarizes
+   - Cold starts
+   - Lambda worker shutdowns
+   - Execution patterns
+
+4. PROVIDED AS LAMBDA LAYER
+   - Lambda Insights is provided as a Lambda Layer
+   - Easy to add to functions
+   - No code changes needed
+
+### Dashboard Metrics:
+
+```
+LAMBDA INSIGHTS DASHBOARD:
+─────────────────────────────
+Performance monitoring:
+- Function Cost
+- Duration
+- Invocations
+- Errors
+- Memory Usage (Max)
+- Network Usage
+- Concurrent Executions Maximum
+- Throttles
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 27: CLOUDWATCH CONTRIBUTOR INSIGHTS
+
+### Concept:
+CloudWatch Contributor Insights analyzes log data and creates time series 
+that display contributor data.
+
+### Key Features:
+
+1. ANALYZE LOG DATA
+   - Analyze log data
+   - Create time series displaying contributor data
+   - See metrics about top-N contributors
+
+2. TOP CONTRIBUTORS
+   - See metrics about the top-N contributors
+   - The total number of unique contributors
+   - And their usage
+
+3. FIND TOP TALKERS
+   - Helps find top talkers
+   - Understand who or what is impacting system performance
+   - Identify patterns
+
+4. WORKS FOR AWS-GENERATED LOGS
+   - VPC Flow Logs
+   - DNS logs
+   - And more
+
+5. FIND BAD ACTORS
+   - Find bad hosts
+   - Identify the heaviest network users
+   - Find URLs that generate the most errors
+
+6. BUILD OR USE SAMPLE RULES
+   - Build your rules from scratch
+   - Or use sample rules that AWS has created
+   - Leverages your CloudWatch Logs
+
+7. BUILT-IN RULES
+   - CloudWatch provides built-in rules
+   - To analyze metrics from other AWS services
+   - Pre-built insights
+
+### Architecture:
+
+```
+CONTRIBUTOR INSIGHTS FLOW:
+
+┌─────────────────┐
+│ VPC Flow Logs   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ CloudWatch Logs │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────────────┐
+│ CloudWatch Contributor  │
+│ Insights                │
+│                         │
+│ Analyze and identify:   │
+│ - Top-10 IP addresses   │
+│ - Heaviest users        │
+│ - Most errors           │
+└─────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 28: CLOUDWATCH APPLICATION INSIGHTS
+
+### Concept:
+CloudWatch Application Insights provides automated dashboards that show 
+potential problems with monitored applications.
+
+### Key Features:
+
+1. AUTOMATED DASHBOARDS
+   - Provides automated dashboards
+   - Show potential problems with monitored applications
+   - Help isolate ongoing issues
+
+2. SUPPORTED TECHNOLOGIES
+   - Applications run on Amazon EC2 Instances
+   - Select technologies only:
+     - Java
+     - .NET
+     - Microsoft IIS Web Server
+     - Databases
+
+3. OTHER AWS RESOURCES
+   - Can use other AWS resources:
+     - Amazon EBS
+     - Amazon RDS
+     - Amazon ELB
+     - Amazon ASG
+     - AWS Lambda
+     - Amazon SQS
+     - Amazon DynamoDB
+     - S3 bucket
+     - Amazon ECS, EKS
+     - Amazon SNS
+     - API Gateway
+
+4. POWERED BY SAGEMAKER
+   - Powered by SageMaker (ML)
+   - Automatic anomaly detection
+   - Pattern recognition
+
+5. ENHANCED VISIBILITY
+   - Enhanced visibility into application health
+   - Reduce time to troubleshoot
+   - Repair your applications faster
+
+6. FINDINGS AND ALERTS
+   - Findings and alerts are sent to:
+     - Amazon EventBridge
+     - SSM OpsCenter
+   - Automated response
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 29: CLOUDWATCH INSIGHTS AND OPERATIONAL VISIBILITY (SUMMARY)
+
+### Summary of All CloudWatch Insights:
+
+1. CLOUDWATCH CONTAINER INSIGHTS
+   - Platforms: ECS, EKS, Kubernetes on EC2, Fargate
+   - What it provides: Metrics and logs from containers
+   - Note: Needs agent for Kubernetes
+
+2. CLOUDWATCH LAMBDA INSIGHTS
+   - What it provides: Detailed metrics to troubleshoot serverless applications
+   - How: Lambda Layer
+   - Metrics: Cold starts, memory, duration, etc.
+
+3. CLOUDWATCH CONTRIBUTORS INSIGHTS
+   - What it provides: Find "Top-N" Contributors through CloudWatch Logs
+   - Use case: Identify top talkers, bad actors
+   - Based on: VPC Flow Logs, DNS logs, etc.
+
+4. CLOUDWATCH APPLICATION INSIGHTS
+   - What it provides: Automatic dashboard to troubleshoot your application
+   - Scope: Application and related AWS services
+   - Powered by: SageMaker ML
+
+### Quick Reference:
+
+```
+INSIGHT TYPE              FOCUS                USE CASE
+───────────────────────────────────────────────────────────────
+Container Insights    →  ECS/EKS containers  → Container monitoring
+Lambda Insights       →  Lambda functions    → Serverless debugging
+Contributor Insights  →  Log analysis        → Find top talkers
+Application Insights  →  App + AWS services  → Holistic app health
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 30: AWS CLOUDTRAIL
+
+### Concept:
+AWS CloudTrail provides governance, compliance, and audit for your AWS Account 
+by recording all API activity.
+
+### Key Features:
+
+1. GOVERNANCE, COMPLIANCE, AND AUDIT
+   - Provides governance, compliance, and audit
+   - For your AWS Account
+   - Complete activity history
+
+2. ENABLED BY DEFAULT
+   - CloudTrail is enabled by default!
+   - No configuration needed
+   - Immediate visibility
+
+3. HISTORY OF EVENTS/API CALLS
+   - Get a history of events / API calls made within your AWS Account
+   - By: Console, SDK, CLI, AWS Services
+   - Complete audit trail
+
+4. LOG DESTINATIONS
+   - Can put logs from CloudTrail into CloudWatch Logs
+   - Or S3 bucket
+   - Long-term storage
+
+5. TRAIL SCOPE
+   - A trail can be applied to All Regions (default)
+   - Or a single Region
+   - Flexible configuration
+
+6. INVESTIGATION TIP
+   - If a resource is deleted in AWS
+   - Investigate CloudTrail first!
+   - Find who did what
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 31: CLOUDTRAIL DIAGRAM
+
+### Architecture:
+
+```
+CLOUDTRAIL ARCHITECTURE:
+
+                    ┌─────────────────────────────┐
+                    │      CloudTrail Console     │
+                    └──────────────┬──────────────┘
+                                   │
+        ┌──────────────────────────┼──────────────────────────┐
+        │                          │                          │
+        ▼                          ▼                          ▼
+┌───────────────┐          ┌───────────────┐          ┌───────────────┐
+│     SDK       │          │     CLI       │          │   Console     │
+│   ┌───────┐   │          │   ┌───────┐   │          │   ┌───────┐   │
+│   │ API   │   │          │   │ API   │   │          │   │  aws  │   │
+│   │ calls │   │          │   │ calls │   │          │   │console│   │
+│   └───────┘   │          │   └───────┘   │          │   └───────┘   │
+└───────┬───────┘          └───────┬───────┘          └───────┬───────┘
+        │                          │                          │
+        └──────────────────────────┼──────────────────────────┘
+                                   │
+                                   ▼
+                    ┌─────────────────────────────┐
+                    │        CloudTrail           │
+                    │                             │
+                    │  ┌───────────────────────┐  │
+                    │  │ IAM Users & IAM Roles │  │
+                    │  └───────────────────────┘  │
+                    │                             │
+                    │    Inspect & Audit          │
+                    └──────────────┬──────────────┘
+                                   │
+                    ┌──────────────┴──────────────┐
+                    │                             │
+                    ▼                             ▼
+         ┌─────────────────┐           ┌─────────────────┐
+         │ CloudWatch Logs │           │   S3 Bucket     │
+         └─────────────────┘           └─────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 32: CLOUDTRAIL EVENTS
+
+### Three Types of Events:
+
+### 1. MANAGEMENT EVENTS
+
+- Operations performed on resources in your AWS account
+- Examples:
+  - Configuring security (IAM AttachRolePolicy)
+  - Configuring rules for routing data (Amazon EC2 CreateSubnet)
+  - Setting up logging (AWS CloudTrail CreateTrail)
+- By default, trails are configured to log management events
+- Can separate Read Events (don't modify) from Write Events (may modify)
+
+### 2. DATA EVENTS
+
+- By default, data events are NOT logged (high volume operations)
+- Amazon S3 object-level activity:
+  - GetObject, DeleteObject, PutObject
+  - Can separate Read and Write Events
+- AWS Lambda function execution activity:
+  - The Invoke API
+
+### 3. CLOUDTRAIL INSIGHTS EVENTS
+
+- See next slide!
+- Detect unusual activity
+
+### Event Comparison:
+
+```
+EVENT TYPE          LOGGED BY DEFAULT    EXAMPLE
+───────────────────────────────────────────────────────────────
+Management Events   Yes                  CreateBucket, 
+                                         AttachRolePolicy
+Data Events         No                   GetObject, PutObject,
+                                         Lambda Invoke
+Insights Events     No (enable)          Unusual API activity
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 33: CLOUDTRAIL INSIGHTS
+
+### Concept:
+Enable CloudTrail Insights to detect unusual activity in your account.
+
+### What It Detects:
+
+- Inaccurate resource provisioning
+- Hitting service limits
+- Bursts of AWS IAM actions
+- Gaps in periodic maintenance activity
+
+### How It Works:
+
+1. BASELINE CREATION
+   - CloudTrail Insights analyzes normal management events
+   - Creates a baseline of normal activity
+   - Learns your patterns
+
+2. CONTINUOUS ANALYSIS
+   - Continuously analyzes WRITE events
+   - Detects unusual patterns
+   - Compares to baseline
+
+3. ANOMALY DETECTION
+   - Anomalies appear in CloudTrail console
+   - Event is sent to Amazon S3
+   - An EventBridge event is generated (for automation)
+
+### Architecture:
+
+```
+CLOUDTRAIL INSIGHTS:
+
+Management Events                                   
+       │                                           ┌──────────────────┐
+       │ Continuous analysis                       │ CloudTrail       │
+       ▼                                     ┌────►│ Console          │
+┌─────────────────┐         generate         │     └──────────────────┘
+│   CloudTrail    │────────────────────┐     │
+│   Insights      │   Insights Events  │─────┤     ┌──────────────────┐
+│                 │                    │     ├────►│ S3 Bucket        │
+│ Analyzes normal │                    │     │     └──────────────────┘
+│ events to create│                    │     │
+│ a baseline      │                    │     │     ┌──────────────────┐
+└─────────────────┘                    └─────┴────►│ EventBridge      │
+                                                   │ event            │
+                                                   └──────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 34: CLOUDTRAIL EVENTS RETENTION
+
+### Retention:
+
+1. DEFAULT RETENTION
+   - Events are stored for 90 days in CloudTrail
+   - Viewable in console
+   - Searchable
+
+2. LONG-TERM RETENTION
+   - To keep events beyond 90 days
+   - Log them to S3
+   - Use Athena for analysis
+
+### Architecture:
+
+```
+CLOUDTRAIL RETENTION:
+
+┌───────────────────┐
+│ Management Events │──┐
+└───────────────────┘  │
+                       │
+┌───────────────────┐  │     ┌─────────────────┐
+│ Data Events       │──┼────►│   CloudTrail    │
+└───────────────────┘  │     │                 │
+                       │     │  90 days        │
+┌───────────────────┐  │     │  retention      │
+│ Insights Events   │──┘     └────────┬────────┘
+└───────────────────┘                 │
+                                      │ log
+                                      ▼
+                              ┌───────────────────┐
+                              │    S3 Bucket      │
+                              │                   │
+                              │ Long-term         │
+                              │ retention         │
+                              └─────────┬─────────┘
+                                        │
+                                        │ analyze
+                                        ▼
+                              ┌───────────────────┐
+                              │     Athena        │
+                              │                   │
+                              │ SQL queries on    │
+                              │ CloudTrail logs   │
+                              └───────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 35: AMAZON EVENTBRIDGE – INTERCEPT API CALLS
+
+### Concept:
+Use CloudTrail and EventBridge together to intercept and react to any 
+API call.
+
+### Example: Alert on DynamoDB DeleteTable
+
+```
+API CALL INTERCEPTION:
+
+        ┌───────────┐
+        │   User    │
+        └─────┬─────┘
+              │
+              │ DeleteTable API Call
+              ▼
+        ┌───────────────┐
+        │   DynamoDB    │
+        └───────┬───────┘
+                │
+                │ Log API call
+                ▼
+        ┌───────────────┐
+        │  CloudTrail   │
+        │ (any API call)│
+        └───────┬───────┘
+                │
+                │ event
+                ▼
+        ┌───────────────┐
+        │   Amazon      │
+        │  EventBridge  │
+        └───────┬───────┘
+                │
+                │ alert
+                ▼
+        ┌───────────────┐
+        │     SNS       │
+        │ (notification)│
+        └───────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 36: AMAZON EVENTBRIDGE + CLOUDTRAIL
+
+### Common Patterns:
+
+### Pattern 1: IAM Role Assumption Alert
+
+```
+User ─► AssumeRole ─► IAM ─► API Call logs ─► CloudTrail ─► event ─► EventBridge ─► SNS
+```
+
+### Pattern 2: Security Group Change Alert
+
+```
+User ─► AuthorizeSecurityGroupIngress ─► EC2 ─► API Call logs ─► CloudTrail ─► event ─► EventBridge ─► SNS
+              (edit SG Inbound Rules)     Security Group
+```
+
+### Use Cases:
+
+✓ Detect IAM role assumption
+✓ Alert on security group changes
+✓ Monitor resource deletion
+✓ Track permission changes
+✓ Compliance alerting
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 37: AWS CONFIG
+
+### Concept:
+AWS Config helps with auditing and recording compliance of your AWS resources 
+by tracking configuration changes over time.
+
+### Key Features:
+
+1. AUDITING AND RECORDING COMPLIANCE
+   - Helps with auditing and recording compliance
+   - Of your AWS resources
+   - Continuous monitoring
+
+2. RECORD CONFIGURATIONS
+   - Helps record configurations and changes over time
+   - Historical view
+   - What changed, when, by whom
+
+3. QUESTIONS AWS CONFIG CAN ANSWER:
+   - Is there unrestricted SSH access to my security groups?
+   - Do my buckets have any public access?
+   - How has my ALB configuration changed over time?
+
+4. ALERTS (SNS NOTIFICATIONS)
+   - You can receive alerts for any changes
+   - SNS notifications
+   - Real-time awareness
+
+5. PER-REGION SERVICE
+   - AWS Config is a per-region service
+   - Configure in each region
+   - Can be aggregated across regions and accounts
+
+6. S3 STORAGE
+   - Possibility of storing configuration data into S3
+   - Analyzed by Athena
+   - Long-term storage
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 38: CONFIG RULES
+
+### Types of Rules:
+
+1. AWS MANAGED CONFIG RULES
+   - Can use AWS managed config rules (over 75)
+   - Pre-built by AWS
+   - Common compliance checks
+
+2. CUSTOM CONFIG RULES
+   - Can make custom config rules
+   - Must be defined in AWS Lambda
+   - Examples:
+     - Evaluate if each EBS disk is of type gp2
+     - Evaluate if each EC2 instance is t2.micro
+
+### Rule Triggers:
+
+Rules can be evaluated / triggered:
+- For each config change (real-time)
+- And / or: at regular time intervals (periodic)
+
+### Important Note:
+
+⚠️ AWS Config Rules does NOT prevent actions from happening (no deny)
+   - Config is for DETECTION, not PREVENTION
+   - Use IAM or SCPs for prevention
+
+### Pricing:
+
+- No free tier
+- $0.003 per configuration item recorded per region
+- $0.001 per config rule evaluation per region
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 39: AWS CONFIG RESOURCE
+
+### What You Can View:
+
+1. COMPLIANCE OF A RESOURCE OVER TIME
+   
+```
+Resource ID               Type                 Status
+─────────────────────────────────────────────────────────
+sg-077b425b1649da83e     EC2 SecurityGroup    ✓ Compliant
+sg-0831434f1876c0c74     EC2 SecurityGroup    ⚠ Noncompliant
+sg-09f10ed254d464f30     EC2 SecurityGroup    ✓ Compliant
+```
+
+2. CONFIGURATION OF A RESOURCE OVER TIME
+
+```
+July 3, 2021
+─────────────────────────────────────────────────────────
+14:37:44    ▣ Configuration change       1 field change(s)
+14:33:26    ▣ Configuration change       0 field change(s)
+```
+
+3. CLOUDTRAIL API CALLS OF A RESOURCE OVER TIME
+
+```
+July 3, 2021
+─────────────────────────────────────────────────────────
+14:35:31    ▣ CloudTrail Event
+14:32:46    ▣ CloudTrail Event
+14:32:45    ▣ CloudTrail Event
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 40: CONFIG RULES – REMEDIATIONS
+
+### Concept:
+Automate remediation of non-compliant resources using SSM Automation Documents.
+
+### Key Features:
+
+1. SSM AUTOMATION DOCUMENTS
+   - Automate remediation of non-compliant resources
+   - Use SSM Automation Documents
+   - Predefined actions
+
+2. AWS-MANAGED OR CUSTOM DOCUMENTS
+   - Use AWS-Managed Automation Documents
+   - Or create custom Automation Documents
+   - Tip: Create custom docs that invoke Lambda functions
+
+3. REMEDIATION RETRIES
+   - You can set Remediation Retries
+   - If resource is still non-compliant after auto-remediation
+   - Keep trying
+
+### Architecture:
+
+```
+CONFIG REMEDIATION:
+
+┌─────────────────┐      monitor     ┌───────────────┐
+│  IAM Access Key │◄─────────────────│   AWS Config  │
+│ (NON_COMPLIANT) │                  │               │
+│                 │      trigger     │  Rule:        │
+│   expired ⚠️    │◄─────────────────│  AccessKey    │
+│                 │                  │  expired      │
+└────────┬────────┘                  └───────────────┘
+         │                                  │
+         │                                  │ trigger
+         │ deactivate                       ▼
+         │                    ┌──────────────────────────────────┐
+         │                    │ Auto-Remediation Action          │
+         ◄────────────────────│                                  │
+                              │ (SSM Document:                   │
+                              │  AWSConfigRemediation-            │
+                              │  RevokeUnusedIAMUserCredentials) │
+                              │                                  │
+                              │ Retries: 5                       │
+                              └──────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 41: CONFIG RULES – NOTIFICATIONS
+
+### Two Notification Methods:
+
+### Method 1: EventBridge for Non-Compliance
+
+```
+AWS Resources                    
+┌────────────────┐      monitor      ┌───────────────┐     trigger    ┌───────────────┐
+│ Security group │───────────────────│   AWS Config  │────────────────│  EventBridge  │
+│                │                   │               │                └───────┬───────┘
+│    Lambda      │                   │⚠ NON_COMPLIANT│                        │
+│                │                   │               │                   ┌────┴────┐
+│    ...         │                   └───────────────┘                   │         │
+└────────────────┘                                                       ▼         ▼
+                                                                    ┌───────┐ ┌───────┐
+                                                                    │Lambda │ │  SNS  │
+                                                                    └───────┘ └───────┘
+                                                                              ┌───────┐
+                                                                              │  SQS  │
+                                                                              └───────┘
+```
+
+### Method 2: SNS for All Events
+
+```
+AWS Resources                    
+┌────────────────┐      monitor      ┌───────────────┐     trigger    ┌───────────────┐
+│ Security group │───────────────────│   AWS Config  │────────────────│     SNS       │
+│                │                   │               │   notification └───────┬───────┘
+│    Lambda      │   All events:     │               │                        │
+│                │   (config changes,│               │                        ▼
+│    ...         │    compliance...) │               │                  ┌───────────┐
+└────────────────┘                   └───────────────┘                  │   Admin   │
+                                                                        └───────────┘
+
+Use SNS Filtering or filter at client-side
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 42: CLOUDWATCH VS CLOUDTRAIL VS CONFIG
+
+### Comparison:
+
+### CLOUDWATCH
+- Performance monitoring (metrics, CPU, network, etc.)
+- Dashboards for visualization
+- Events & Alerting
+- Log Aggregation & Analysis
+
+### CLOUDTRAIL
+- Record API calls made within your Account
+- By everyone (users, roles, services)
+- Can define trails for specific resources
+- Global Service
+
+### CONFIG
+- Record configuration changes
+- Evaluate resources against compliance rules
+- Get timeline of changes and compliance
+- Per-region service (can aggregate)
+
+### Quick Reference:
+
+```
+QUESTION                                    SERVICE TO USE
+─────────────────────────────────────────────────────────────────
+"How is my CPU usage?"                  →   CloudWatch
+"Who deleted this S3 bucket?"           →   CloudTrail
+"Is this security group compliant?"     →   Config
+"What's my application performance?"    →   CloudWatch
+"What API calls were made today?"       →   CloudTrail
+"How has my config changed over time?"  →   Config
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 43: FOR AN ELASTIC LOAD BALANCER (EXAMPLE)
+
+### Using All Three Services Together:
+
+### CLOUDWATCH:
+- Monitoring Incoming connections metric
+- Visualize error codes as % over time
+- Make a dashboard to get an idea of your load balancer performance
+
+### CONFIG:
+- Track security group rules for the Load Balancer
+- Track configuration changes for the Load Balancer
+- Ensure an SSL certificate is always assigned to the Load Balancer (compliance)
+
+### CLOUDTRAIL:
+- Track who made any changes to the Load Balancer with API calls
+
+### Architecture:
+
+```
+COMPLETE ELB MONITORING:
+
+                    ┌─────────────────────────────────────┐
+                    │      Elastic Load Balancer          │
+                    └─────────────────┬───────────────────┘
+                                      │
+        ┌─────────────────────────────┼─────────────────────────────┐
+        │                             │                             │
+        ▼                             ▼                             ▼
+┌───────────────────┐     ┌───────────────────┐     ┌───────────────────┐
+│    CloudWatch     │     │      Config       │     │    CloudTrail     │
+│                   │     │                   │     │                   │
+│ - Request count   │     │ - SG rules        │     │ - CreateLB        │
+│ - Latency         │     │ - Config history  │     │ - ModifyListener  │
+│ - Error codes     │     │ - SSL compliance  │     │ - Who did what    │
+│ - Healthy hosts   │     │ - Rule compliance │     │ - API history     │
+└───────────────────┘     └───────────────────┘     └───────────────────┘
+        │                             │                             │
+        │ PERFORMANCE                 │ COMPLIANCE                  │ AUDIT
+        ▼                             ▼                             ▼
+   "How fast?"                 "Is it secure?"              "Who changed it?"
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              SUMMARY & EXAM TIPS
+═══════════════════════════════════════════════════════════════════════════════
+
+### Quick Reference:
+
+```
+SERVICE/FEATURE               KEY POINT
+───────────────────────────────────────────────────────────────────────
+CloudWatch Metrics       →   Variables to monitor (CPU, Network)
+CloudWatch Logs          →   Log groups, streams, expiration
+CloudWatch Alarms        →   OK, INSUFFICIENT_DATA, ALARM states
+Composite Alarms         →   AND/OR multiple alarms
+Logs Insights            →   Query language, not real-time
+S3 Export                →   Up to 12 hours delay, use subscriptions
+Subscriptions            →   Real-time to Kinesis, Lambda
+Unified Agent            →   RAM, disk, processes (not default)
+EventBridge              →   Cron + Event patterns
+CloudTrail               →   API audit, enabled by default, 90 days
+CloudTrail Insights      →   Detect unusual activity (ML)
+AWS Config               →   Compliance, configuration history
+Config Remediations      →   Auto-fix with SSM Automation
+```
+
+### Exam Tips:
+
+✓ CloudWatch = Performance (metrics, logs, alarms)
+✓ CloudTrail = Audit (API calls, who did what)
+✓ Config = Compliance (configuration state, rules)
+✓ CloudTrail is enabled by DEFAULT
+✓ Config Rules do NOT prevent actions (detection only)
+✓ S3 Export takes up to 12 hours - use Subscriptions for real-time
+✓ Unified Agent needed for RAM metrics
+✓ EventBridge = Cron jobs + Event reactions
+✓ CloudTrail events retained 90 days, use S3 for longer
+
+═══════════════════════════════════════════════════════════════════════════════
+                                  END OF GUIDE
+═══════════════════════════════════════════════════════════════════════════════
