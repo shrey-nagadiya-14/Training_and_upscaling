@@ -1,1 +1,2139 @@
+# AWS ADVANCED IDENTITY - COMPLETE GUIDE (PART 1)
+## AWS Organizations, SCPs, IAM Conditions & Policies
 
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Advanced Identity in AWS (Overview)
+2. AWS Organizations
+3. AWS Organizations (Structure Diagram)
+4. Organizational Units (OU) - Examples
+5. AWS Organizations (Advantages & SCPs)
+6. SCP Hierarchy
+7. SCP Examples - Blocklist and Allowlist Strategies
+8. AWS Organizations – Tag Policies
+9. IAM Conditions (aws:SourceIp and aws:RequestedRegion)
+10. IAM Conditions (ec2:ResourceTag and aws:MultiFactorAuthPresent)
+11. IAM for S3
+12. Resource Policies & aws:PrincipalOrgID
+13. IAM Roles vs Resource Based Policies
+14. Amazon EventBridge – Security
+15. IAM Permission Boundaries
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 1: ADVANCED IDENTITY IN AWS
+
+### Title Slide Overview:
+
+This section covers advanced identity and access management concepts in AWS:
+
+1. AWS ORGANIZATIONS
+   - Multi-account management
+   - Organizational Units (OUs)
+   - Service Control Policies (SCPs)
+
+2. IAM ADVANCED CONCEPTS
+   - IAM Conditions
+   - Permission Boundaries
+   - Policy Evaluation Logic
+
+3. IAM IDENTITY CENTER
+   - Single Sign-On (SSO)
+   - Active Directory Integration
+   - Permission Sets
+
+4. AWS CONTROL TOWER
+   - Guardrails
+   - Multi-account governance
+
+### Why Advanced Identity Matters:
+
+```
+ENTERPRISE CHALLENGES:
+- Multiple AWS accounts
+- Different teams and environments
+- Compliance requirements
+- Security at scale
+- Centralized management
+
+SOLUTIONS:
+- AWS Organizations for structure
+- SCPs for guardrails
+- IAM Identity Center for SSO
+- Control Tower for governance
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 2: AWS ORGANIZATIONS
+
+### Concept:
+AWS Organizations is a global service that allows you to manage multiple 
+AWS accounts from a central location.
+
+### Key Features:
+
+1. GLOBAL SERVICE
+   - Works across all regions
+   - Centralized management console
+   - Single pane of glass
+
+2. MANAGE MULTIPLE AWS ACCOUNTS
+   - Allows to manage multiple AWS accounts
+   - Centralized control
+   - Hierarchical structure
+
+3. MANAGEMENT ACCOUNT
+   - The main account is the management account
+   - Has full administrative privileges
+   - Cannot be changed
+
+4. MEMBER ACCOUNTS
+   - Other accounts are member accounts
+   - Joined to the organization
+   - Controlled by management account
+
+5. ACCOUNT MEMBERSHIP
+   - Member accounts can only be part of ONE organization
+   - Cannot belong to multiple organizations
+   - Must leave before joining another
+
+6. CONSOLIDATED BILLING
+   - Consolidated Billing across all accounts
+   - Single payment method
+   - One bill for all accounts
+
+7. PRICING BENEFITS
+   - Pricing benefits from aggregated usage
+   - Volume discount for EC2, S3, etc.
+   - Combined usage = bigger discounts
+
+8. SHARED RESERVED INSTANCES
+   - Shared reserved instances and Savings Plans discounts across accounts
+   - Buy RIs in one account, use in others
+   - Cost optimization
+
+9. API FOR AUTOMATION
+   - API is available to automate AWS account creation
+   - Programmatic account provisioning
+   - Infrastructure as Code
+
+### Quick Summary:
+
+```
+FEATURE                          DESCRIPTION
+───────────────────────────────────────────────────────────────────────
+Global Service              →    Works across all regions
+Multi-Account Management    →    Centralize many AWS accounts
+Management Account          →    The main/master account
+Member Accounts            →    Other accounts under management
+One Organization Only      →    Account can only be in one org
+Consolidated Billing       →    Single payment method
+Volume Discounts           →    Aggregated usage pricing
+Shared RIs/Savings Plans   →    Cross-account cost sharing
+Account Creation API       →    Automate account provisioning
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 3: AWS ORGANIZATIONS - STRUCTURE DIAGRAM
+
+### Organizational Structure:
+
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │              ROOT ORGANIZATIONAL UNIT (OU)              │
+                    │                                                         │
+                    │    ┌──────────────────────────────────┐                 │
+                    │    │      Management Account          │                 │
+                    │    │      (Master Account)            │                 │
+                    │    └──────────────────────────────────┘                 │
+                    │                                                         │
+                    │    ┌──────────────────┐  ┌──────────────────────────┐   │
+                    │    │    OU (Dev)      │  │       OU (Prod)          │   │
+                    │    │                  │  │                          │   │
+                    │    │  ┌────┐ ┌────┐   │  │  ┌────┐ ┌────┐           │   │
+                    │    │  │Acct│ │Acct│   │  │  │Acct│ │Acct│           │   │
+                    │    │  └────┘ └────┘   │  │  └────┘ └────┘           │   │
+                    │    │  Member Accounts │  │                          │   │
+                    │    │                  │  │  ┌───────────────────┐   │   │
+                    │    └──────────────────┘  │  │     OU (HR)       │   │   │
+                    │                          │  │  ┌────┐ ┌────┐    │   │   │
+                    │                          │  │  │Acct│ │Acct│    │   │   │
+                    │                          │  │  └────┘ └────┘    │   │   │
+                    │                          │  └───────────────────┘   │   │
+                    │                          │                          │   │
+                    │                          │  ┌───────────────────┐   │   │
+                    │                          │  │   OU (Finance)    │   │   │
+                    │                          │  │  ┌────┐ ┌────┐    │   │   │
+                    │                          │  │  │Acct│ │Acct│    │   │   │
+                    │                          │  │  └────┘ └────┘    │   │   │
+                    │                          │  └───────────────────┘   │   │
+                    │                          │                          │   │
+                    │                          └──────────────────────────┘   │
+                    └─────────────────────────────────────────────────────────┘
+```
+
+### Key Concepts:
+
+1. ROOT OU
+   - Top-level container
+   - Contains all accounts and OUs
+   - Where organization starts
+
+2. ORGANIZATIONAL UNITS (OUs)
+   - Containers for accounts
+   - Can be nested (OU within OU)
+   - Apply policies at OU level
+
+3. ACCOUNTS
+   - Individual AWS accounts
+   - Member accounts within OUs
+   - Inherit policies from parent OUs
+
+### Hierarchy Rules:
+
+```
+- Root OU is at the top
+- Management Account is in Root OU
+- OUs can contain other OUs (nesting)
+- Accounts can be in Root OU or any OU
+- Policies inherit down the tree
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 4: ORGANIZATIONAL UNITS (OU) - EXAMPLES
+
+### Three Common OU Strategies:
+
+### Strategy 1: BUSINESS UNIT
+
+```
+                    ┌─────────────────┐
+                    │   Management    │
+                    │    Account      │
+                    └────────┬────────┘
+                             │
+           ┌─────────────────┼─────────────────┐
+           │                 │                 │
+    ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐
+    │  Sales OU   │   │  Retail OU  │   │ Finance OU  │
+    └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+           │                 │                 │
+     ┌─────┴─────┐     ┌─────┴─────┐     ┌─────┴─────┐
+     │Sales     │     │Retail    │     │Finance   │
+     │Account 1 │     │Account 1 │     │Account 1 │
+     │Sales     │     │Retail    │     │Finance   │
+     │Account 2 │     │Account 2 │     │Account 2 │
+     └───────────┘     └───────────┘     └───────────┘
+```
+
+**Use Case:** Organize by business function (Sales, Retail, Finance, HR)
+**Best For:** Large enterprises with distinct business units
+
+### Strategy 2: ENVIRONMENTAL LIFECYCLE
+
+```
+                    ┌─────────────────┐
+                    │   Management    │
+                    │    Account      │
+                    └────────┬────────┘
+                             │
+           ┌─────────────────┼─────────────────┐
+           │                 │                 │
+    ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐
+    │  Prod OU    │   │   Dev OU    │   │  Test OU    │
+    └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+           │                 │                 │
+     ┌─────┴─────┐     ┌─────┴─────┐     ┌─────┴─────┐
+     │Prod      │     │Dev       │     │Test      │
+     │Account 1 │     │Account 1 │     │Account 1 │
+     │Prod      │     │Dev       │     │Test      │
+     │Account 2 │     │Account 2 │     │Account 2 │
+     └───────────┘     └───────────┘     └───────────┘
+```
+
+**Use Case:** Organize by environment (Production, Development, Test)
+**Best For:** Companies wanting strict environment separation
+
+### Strategy 3: PROJECT-BASED
+
+```
+                    ┌─────────────────┐
+                    │   Management    │
+                    │    Account      │
+                    └────────┬────────┘
+                             │
+           ┌─────────────────┼─────────────────┐
+           │                 │                 │
+    ┌──────┴──────┐   ┌──────┴──────┐   ┌──────┴──────┐
+    │ Project 1   │   │ Project 2   │   │ Project 3   │
+    │    OU       │   │    OU       │   │    OU       │
+    └──────┬──────┘   └──────┬──────┘   └──────┬──────┘
+           │                 │                 │
+     ┌─────┴─────┐     ┌─────┴─────┐     ┌─────┴─────┐
+     │Project 1 │     │Project 2 │     │Project 3 │
+     │Account 1 │     │Account 1 │     │Account 1 │
+     │Project 1 │     │Project 2 │     │Project 3 │
+     │Account 2 │     │Account 2 │     │Account 2 │
+     └───────────┘     └───────────┘     └───────────┘
+```
+
+**Use Case:** Organize by project or product
+**Best For:** Product-focused organizations
+
+### Choosing the Right Strategy:
+
+```
+STRATEGY              BEST FOR                     BENEFIT
+──────────────────────────────────────────────────────────────────
+Business Unit    →   Large enterprises        →   Cost allocation by dept
+Environmental    →   DevOps teams             →   Strict env separation
+Project-Based    →   Product companies        →   Project isolation
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 5: AWS ORGANIZATIONS - ADVANTAGES & SCPs
+
+### Advantages:
+
+1. MULTI-ACCOUNT VS ONE ACCOUNT MULTI-VPC
+   - Better isolation between environments
+   - Clear boundaries
+   - Reduced blast radius
+
+2. USE TAGGING STANDARDS
+   - Use tagging standards for billing purposes
+   - Consistent tagging across accounts
+   - Cost allocation
+
+3. ENABLE CLOUDTRAIL ON ALL ACCOUNTS
+   - Enable CloudTrail on all accounts
+   - Send logs to central S3 account
+   - Centralized audit logging
+
+4. SEND CLOUDWATCH LOGS
+   - Send CloudWatch Logs to central logging account
+   - Aggregate logs
+   - Centralized monitoring
+
+5. ESTABLISH CROSS ACCOUNT ROLES
+   - Establish Cross Account Roles for Admin purposes
+   - Manage member accounts from management account
+   - Centralized administration
+
+### Security: Service Control Policies (SCP)
+
+1. WHAT ARE SCPs?
+   - IAM policies applied to OU or Accounts
+   - Restrict what Users and Roles can do
+   - Guardrails for the organization
+
+2. MANAGEMENT ACCOUNT EXEMPT
+   - SCPs do NOT apply to the management account
+   - Management account has full admin power
+   - Cannot restrict yourself
+
+3. EXPLICIT ALLOW REQUIRED
+   - Must have an EXPLICIT allow from the root
+   - Through each OU in the direct path
+   - To the target account
+   - Does NOT allow anything by default (like IAM)
+
+### SCP Key Points:
+
+```
+SCP RULES:
+─────────────────────────────────────────────────────────────────
+✓ Applied to OUs or Accounts
+✓ Restricts Users AND Roles (including root)
+✗ Does NOT apply to Management Account
+✓ Explicit Allow required at EVERY level
+✓ Deny always wins (like IAM)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 6: SCP HIERARCHY
+
+### How SCPs Cascade Down:
+
+```
+                                                    RESULTS:
+                                                    
+FullAWSAccess ───────► ┌─────────────┐              • Management Account
+                       │  OU (Root)  │                - Can do anything
+                       └──────┬──────┘                - (no SCP apply)
+                              │
+Deny Athena ─────────► ┌──────┴──────┐              • Account A
+                       │ Management  │                - Can do anything
+                       │  Account    │                - EXCEPT S3 (Sandbox OU)
+                       └─────────────┘                - EXCEPT EC2 (explicit Deny)
+                              │
+FullAWSAccess                 │
+         │                    │
+         ▼                    ▼
+┌─────────────────┐    ┌──────────────────┐         • Account B & C
+│ OU (Sandbox)    │    │  OU (Workloads)  │           - Can do anything
+│                 │    │                  │           - EXCEPT S3 (from Sandbox OU)
+│ FullAWSAccess + │    │                  │
+│ Deny S3         │    │                  │
+│ Allow EC2       │    │                  │         • Account D
+└────────┬────────┘    └────────┬─────────┘           - Can access EC2
+         │                      │
+         ▼                      │
+┌─────────────────┐             │                   • Prod OU & Account E & F
+│ Account A       │     ┌───────┴───────┐             - Can do anything
+│                 │     │               │
+│ FullAWSAccess + │     ▼               ▼
+│ Deny EC2        │  ┌───────┐     ┌───────┐
+└─────────────────┘  │OU Test│     │OUProd │
+                     └───┬───┘     └───┬───┘
+    ┌────┐  ┌────┐       │             │
+    │ B  │  │ C  │   ┌───┴───┐    ┌────┴────┐
+    └────┘  └────┘   │Acct D │    │ E  │ F  │
+                     └───────┘    └────┴────┘
+```
+
+### Understanding SCP Inheritance:
+
+```
+ACCOUNT A's EFFECTIVE PERMISSIONS:
+──────────────────────────────────────────────────────────────────
+1. Root OU: FullAWSAccess                    → Everything allowed
+2. Sandbox OU: FullAWSAccess + Deny S3       → Everything EXCEPT S3
+3. Account A: FullAWSAccess + Deny EC2       → Also EXCEPT EC2
+
+FINAL: Can do anything EXCEPT S3 and EC2
+```
+
+### Key Takeaways:
+
+1. SCPs inherit DOWN the tree
+2. Deny at any level = Denied
+3. Must be allowed at EVERY level to work
+4. Management Account is NEVER affected by SCPs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 7: SCP EXAMPLES - BLOCKLIST AND ALLOWLIST STRATEGIES
+
+### Two Strategies for SCPs:
+
+### Strategy 1: BLOCKLIST (Default Allow, Specific Deny)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowsAllActions",
+      "Effect": "Allow",
+      "Action": "*",
+      "Resource": "*"
+    },
+    {
+      "Sid": "DenyDynamoDB",
+      "Effect": "Deny",
+      "Action": "dynamodb:*",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Allow everything by default
+- Explicitly deny specific services
+- Good when you want to block only certain services
+- Example: Block DynamoDB usage
+
+### Strategy 2: ALLOWLIST (Default Deny, Specific Allow)
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "ec2:*",
+        "cloudwatch:*"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Only allow specific services
+- Everything else is implicitly denied
+- More restrictive approach
+- Example: Only allow EC2 and CloudWatch
+
+### Comparison:
+
+```
+STRATEGY        DEFAULT        APPROACH              USE CASE
+────────────────────────────────────────────────────────────────────
+Blocklist   →  Allow all   →  Deny specific     →  Block dangerous services
+Allowlist   →  Deny all    →  Allow specific    →  Strict environments
+```
+
+### Best Practices:
+
+```
+BLOCKLIST:
+- Easier to manage
+- Use for: preventing specific actions
+- Example: Deny region access, deny specific services
+
+ALLOWLIST:
+- More secure
+- Use for: highly restricted environments
+- Example: Sandbox with only specific services
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 8: AWS ORGANIZATIONS – TAG POLICIES
+
+### Concept:
+Tag Policies help you standardize tags across resources in an AWS Organization.
+
+### Key Features:
+
+1. STANDARDIZE TAGS
+   - Helps you standardize tags across resources
+   - In an AWS Organization
+   - Consistent naming conventions
+
+2. ENSURE CONSISTENT TAGS
+   - Ensure consistent tags
+   - Audit tagged resources
+   - Maintain proper resource categorization
+
+3. DEFINE TAG KEYS AND VALUES
+   - You define tag keys and their allowed values
+   - Enforce naming conventions
+   - Control tag values
+
+4. COST ALLOCATION TAGS
+   - Helps with AWS Cost Allocation Tags
+   - And Attribute-based Access Control (ABAC)
+   - Billing and security
+
+5. PREVENT NON-COMPLIANT TAGGING
+   - Prevent any non-compliant tagging operations
+   - On specified services and resources
+   - Note: Has no effect on resources without tags
+
+6. COMPLIANCE REPORTS
+   - Generate a report that lists all tagged/non-compliant resources
+   - Audit capability
+   - Track compliance
+
+7. EVENTBRIDGE MONITORING
+   - Use EventBridge to monitor non-compliant tags
+   - Real-time alerting
+   - Automated responses
+
+### Example Tag Policy:
+
+```json
+{
+  "tags": {
+    "costcenter": {
+      "tag_key": {
+        "@@assign": "CostCenter"
+      },
+      "tag_value": {
+        "@@assign": ["100", "200"]
+      },
+      "enforced_for": {
+        "@@assign": ["secretsmanager:*"]
+      }
+    }
+  }
+}
+```
+
+**Explanation:**
+- Tag key must be "CostCenter" (case-sensitive)
+- Allowed values: "100" or "200"
+- Enforced for: Secrets Manager resources
+
+### Use Cases:
+
+```
+USE CASE                     TAG POLICY HELPS WITH
+────────────────────────────────────────────────────────────────
+Cost Allocation         →   Ensure CostCenter tag on all resources
+Environment Tracking    →   Force Environment tag (Dev/Prod/Test)
+Project Attribution     →   Require Project tag
+Compliance             →   Ensure required compliance tags
+ABAC                   →   Consistent tags for access control
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 9: IAM CONDITIONS - aws:SourceIp AND aws:RequestedRegion
+
+### IAM Condition: aws:SourceIp
+
+**Purpose:** Restrict the client IP FROM which the API calls are being made.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Action": "*",
+      "Resource": "*",
+      "Condition": {
+        "NotIpAddress": {
+          "aws:SourceIp": ["192.0.2.0/24", "203.0.113.0/24"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Deny all actions
+- If request comes from IP NOT in the specified ranges
+- Only allow from corporate network IPs
+- Useful for restricting to office/VPN
+
+### IAM Condition: aws:RequestedRegion
+
+**Purpose:** Restrict the region TO which the API calls are made.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Deny",
+      "Action": ["ec2:*", "rds:*", "dynamodb:*"],
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["eu-central-1", "eu-west-1"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Deny EC2, RDS, DynamoDB actions
+- If request is to eu-central-1 or eu-west-1
+- Restrict which regions services can be used in
+- Useful for data residency/compliance
+
+### Comparison:
+
+```
+CONDITION                   RESTRICTS                      USE CASE
+────────────────────────────────────────────────────────────────────
+aws:SourceIp           →    Where request comes FROM   →   Office IP only
+aws:RequestedRegion    →    Where request goes TO      →   Region restrictions
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 10: IAM CONDITIONS - ec2:ResourceTag AND aws:MultiFactorAuthPresent
+
+### IAM Condition: ec2:ResourceTag
+
+**Purpose:** Restrict based on resource tags.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["ec2:startInstances", "ec2:StopInstances"],
+      "Resource": "arn:aws:ec2:us-east-1:123456789012:instance/*",
+      "Condition": {
+        "StringEquals": {
+          "ec2:ResourceTag/Project": "DataAnalytics",
+          "aws:PrincipalTag/Department": "Data"
+        }
+      }
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Allow start/stop EC2 instances
+- Only if instance has tag Project=DataAnalytics
+- AND the principal (user) has tag Department=Data
+- Attribute-Based Access Control (ABAC)
+
+### IAM Condition: aws:MultiFactorAuthPresent
+
+**Purpose:** Force MFA for sensitive operations.
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": "ec2:*",
+      "Resource": "*"
+    },
+    {
+      "Effect": "Deny",
+      "Action": ["ec2:StopInstances", "ec2:TerminateInstances"],
+      "Resource": "*",
+      "Condition": {
+        "BoolIfExists": {
+          "aws:MultiFactorAuthPresent": false
+        }
+      }
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Allow all EC2 actions
+- BUT deny Stop and Terminate
+- If MFA is NOT present (false)
+- Forces MFA for destructive operations
+
+### Common IAM Conditions Summary:
+
+```
+CONDITION                        PURPOSE
+────────────────────────────────────────────────────────────────────
+aws:SourceIp                →   Restrict by source IP
+aws:RequestedRegion         →   Restrict by target region
+ec2:ResourceTag             →   Restrict by resource tags
+aws:PrincipalTag            →   Restrict by user/role tags
+aws:MultiFactorAuthPresent  →   Require MFA
+aws:CurrentTime             →   Time-based access
+aws:SecureTransport         →   Require HTTPS
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 11: IAM FOR S3
+
+### S3 Permission Levels:
+
+### 1. BUCKET-LEVEL PERMISSIONS
+
+- s3:ListBucket permission applies to:
+  - `arn:aws:s3:::test`
+  - The bucket itself (no /*)
+  - Bucket-level permission
+
+```json
+{
+  "Effect": "Allow",
+  "Action": ["s3:ListBucket"],
+  "Resource": "arn:aws:s3:::test"
+}
+```
+
+### 2. OBJECT-LEVEL PERMISSIONS
+
+- s3:GetObject, s3:PutObject, s3:DeleteObject apply to:
+  - `arn:aws:s3:::test/*`
+  - Objects inside the bucket (with /*)
+  - Object-level permission
+
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "s3:PutObject",
+    "s3:GetObject",
+    "s3:DeleteObject"
+  ],
+  "Resource": "arn:aws:s3:::test/*"
+}
+```
+
+### Complete S3 Policy Example:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::test"
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject",
+        "s3:GetObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": "arn:aws:s3:::test/*"
+    }
+  ]
+}
+```
+
+### Key Difference:
+
+```
+PERMISSION TYPE        ARN FORMAT                      ACTIONS
+────────────────────────────────────────────────────────────────────
+Bucket-Level      →   arn:aws:s3:::bucket         →   ListBucket
+Object-Level      →   arn:aws:s3:::bucket/*       →   Get/Put/DeleteObject
+
+⚠️ Common mistake: Using /* for ListBucket (won't work!)
+⚠️ Common mistake: Not using /* for GetObject (won't work!)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 12: RESOURCE POLICIES & aws:PrincipalOrgID
+
+### Concept:
+aws:PrincipalOrgID can be used in any resource policies to restrict access 
+to accounts that are member of an AWS Organization.
+
+### Use Case:
+
+```
+SCENARIO:
+- You have an S3 bucket with sensitive data
+- You want ONLY members of your AWS Organization to access it
+- You don't want external accounts accessing it
+```
+
+### Architecture:
+
+```
+┌───────────────────────────────────┐
+│  AWS Organization                 │
+│  (o-yyyyyyyyy)                    │
+│                                   │
+│  ┌────┐ ┌────┐ ┌────┐             │      ✓ Access
+│  │Acct│ │Acct│ │Acct│ ... ───────────────────────────►┌──────────────┐
+│  │    │ │    │ │    │             │                   │  S3 Bucket   │
+│  └────┘ └────┘ └────┘             │                   │              │
+│  Member Accounts                  │                   │ (2022-       │
+│                                   │                   │  financial-  │
+└───────────────────────────────────┘                   │  data)       │
+                                                        │              │
+┌─────────────────┐                       ✗ Access      └──────────────┘
+│ User outside    │ ─────────────────────────────────────────X
+│ Organization    │
+└─────────────────┘
+```
+
+### Example Policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::2022-financial-data/*",
+      "Condition": {
+        "StringEquals": {
+          "aws:PrincipalOrgID": ["o-yyyyyyyyy"]
+        }
+      }
+    }
+  ]
+}
+```
+
+**Explanation:**
+- Allow Put and Get operations
+- Only if the principal's organization ID matches
+- External accounts are automatically denied
+- Don't need to list every account ID
+
+### Benefits:
+
+```
+WITHOUT aws:PrincipalOrgID:
+- Must list every account ID
+- Update policy when accounts added/removed
+- Error-prone
+
+WITH aws:PrincipalOrgID:
+- Single condition covers all accounts
+- Automatically includes new accounts
+- No policy updates needed
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 13 & 14: IAM ROLES VS RESOURCE-BASED POLICIES
+
+### Two Methods for Cross-Account Access:
+
+### Method 1: IAM ROLE (Assume Role)
+
+```
+┌─────────────────────┐                 ┌─────────────────────┐
+│     Account A       │                 │     Account B       │
+│                     │                 │                     │
+│   ┌───────────┐     │   assume role   │   ┌───────────┐     │
+│   │   User    │─────┼─────────────────┼──►│   Role    │     │
+│   └───────────┘     │                 │   └─────┬─────┘     │
+│                     │                 │         │           │
+└─────────────────────┘                 │         ▼           │
+                                        │   ┌───────────┐     │
+                                        │   │ Amazon S3 │     │
+                                        │   └───────────┘     │
+                                        │                     │
+                                        └─────────────────────┘
+```
+
+### Method 2: RESOURCE-BASED POLICY
+
+```
+┌─────────────────────┐                 ┌─────────────────────┐
+│     Account A       │                 │     Account B       │
+│                     │                 │                     │
+│   ┌───────────┐     │   direct access │   ┌───────────┐     │
+│   │   User    │─────┼─────────────────┼──►│ S3 Bucket │     │
+│   └───────────┘     │                 │   │  Policy   │     │
+│                     │                 │   └───────────┘     │
+│                     │                 │                     │
+└─────────────────────┘                 └─────────────────────┘
+```
+
+### Key Difference: Permission Handling
+
+```
+WHEN YOU ASSUME A ROLE:
+──────────────────────────────────────────────────────────────────
+- You GIVE UP your original permissions
+- You TAKE the permissions assigned to the role
+- You can't use both at the same time
+
+WHEN USING RESOURCE-BASED POLICY:
+──────────────────────────────────────────────────────────────────
+- The principal DOESN'T have to give up permissions
+- You KEEP your original permissions
+- Can access resources in both accounts
+```
+
+### Example Scenario:
+
+```
+SCENARIO:
+User in Account A needs to:
+1. Scan a DynamoDB table in Account A
+2. Dump it to an S3 bucket in Account B
+
+WITH ROLE (Account B): 
+- User assumes role in Account B
+- LOSES access to DynamoDB in Account A  ❌
+- Can only access S3 in Account B
+
+WITH RESOURCE-BASED POLICY:
+- S3 bucket policy allows Account A user
+- User KEEPS access to DynamoDB in Account A  ✓
+- Can access BOTH resources  ✓
+```
+
+### Supported Services for Resource-Based Policies:
+
+- Amazon S3 buckets
+- SNS topics
+- SQS queues
+- Lambda functions
+- ECR repositories
+- API Gateway
+- And more...
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 15: AMAZON EVENTBRIDGE – SECURITY
+
+### How EventBridge Gets Permissions:
+
+When a rule runs, it needs permissions on the target. Two approaches:
+
+### Approach 1: RESOURCE-BASED POLICY
+
+**Used for:**
+- Lambda
+- SNS
+- SQS
+- S3 buckets
+- API Gateway
+
+```
+┌─────────────────┐                 ┌─────────────────────────┐
+│  EventBridge    │                 │       Lambda            │
+│     Rule        │────────────────►│                         │
+│                 │                 │ Resource-based Policy:  │
+│                 │                 │ Allow EventBridge       │
+└─────────────────┘                 └─────────────────────────┘
+```
+
+**The TARGET grants permission TO EventBridge**
+
+### Approach 2: IAM ROLE
+
+**Used for:**
+- EC2 Auto Scaling
+- Systems Manager Run Command
+- ECS task
+- Step Functions
+- CodePipeline
+- CodeBuild
+
+```
+┌─────────────────┐     IAM Role     ┌─────────────────────────┐
+│  EventBridge    │─────────────────►│   EC2 Auto Scaling      │
+│     Rule        │                  │                         │
+│                 │                  │                         │
+└─────────────────┘                  └─────────────────────────┘
+
+EventBridge ASSUMES a role to access the target
+```
+
+### Summary:
+
+```
+TARGET SERVICE             PERMISSION METHOD
+────────────────────────────────────────────────────────────────
+Lambda, SNS, SQS      →   Resource-based Policy (target allows)
+S3, API Gateway       →   Resource-based Policy (target allows)
+EC2 Auto Scaling      →   IAM Role (EventBridge assumes)
+SSM Run Command       →   IAM Role (EventBridge assumes)
+ECS Task              →   IAM Role (EventBridge assumes)
+Step Functions        →   IAM Role (EventBridge assumes)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 16 & 17: IAM PERMISSION BOUNDARIES
+
+### Concept:
+IAM Permission Boundaries are an advanced feature to use a managed policy 
+to set the MAXIMUM permissions an IAM entity can get.
+
+### Key Points:
+
+1. SUPPORTED FOR USERS AND ROLES
+   - IAM Permission Boundaries are supported for users and roles
+   - NOT for groups
+   - Individual entity control
+
+2. MAXIMUM PERMISSIONS
+   - Advanced feature to use a managed policy
+   - Set the MAXIMUM permissions an IAM entity can get
+   - Acts as a ceiling
+
+### How It Works:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                                                                 │
+│   IAM Permission Boundary         IAM Permissions               │
+│   (Maximum allowed)               Through IAM Policy            │
+│                                                                 │
+│   ┌─────────────────────┐        ┌─────────────────────┐        │
+│   │ Allow:              │        │ Allow:              │        │
+│   │   s3:*              │   +    │   iam:CreateUser    │   =    │
+│   │   cloudwatch:*      │        │                     │        │
+│   │   ec2:*             │        │                     │        │
+│   └─────────────────────┘        └─────────────────────┘        │
+│                                                                 │
+│                           RESULT: No Permissions                │
+│                                                                 │
+│   (iam:CreateUser is NOT in the boundary, so it's denied)       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Effective Permissions:
+
+```
+EFFECTIVE PERMISSIONS = Intersection of:
+
+┌─────────────────────────────────────────────────────────────┐
+│                                                             │
+│          ┌───────────────┐                                  │
+│          │ Organizations │                                  │
+│          │     SCP       │                                  │
+│          └───────┬───────┘                                  │
+│                  │                                          │
+│                  ▼                                          │
+│          ┌───────────────┐                                  │
+│          │  Permissions  │                                  │
+│          │   Boundary    │                                  │
+│          └───────┬───────┘                                  │
+│                  │                                          │
+│                  ▼                     ┌───────────────────┐│
+│          ┌───────────────┐             │                   ││
+│          │Identity-based │◄──────────► │    Effective      ││
+│          │   Policy      │             │   Permissions     ││
+│          └───────────────┘             │                   ││
+│                                        └───────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Use Cases:
+
+1. DELEGATE TO NON-ADMINISTRATORS
+   - Delegate responsibilities to non administrators
+   - Within their permission boundaries
+   - Example: Allow them to create new IAM users
+
+2. ALLOW SELF-MANAGEMENT
+   - Allow developers to self-assign policies
+   - And manage their own permissions
+   - While making sure they can't "escalate" their privileges
+   - (= make themselves admin)
+
+3. RESTRICT SPECIFIC USER
+   - Useful to restrict one specific user
+   - Instead of a whole account using Organizations & SCP
+   - More granular control
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+Continue to Part 2 for:
+- IAM Policy Evaluation Logic
+- Example IAM Policy Analysis
+- AWS IAM Identity Center (SSO)
+- Microsoft Active Directory Integration
+- AWS Directory Services
+- AWS Control Tower and Guardrails
+
+═══════════════════════════════════════════════════════════════════════════════
+# AWS ADVANCED IDENTITY - COMPLETE GUIDE (PART 2)
+## IAM Policy Evaluation, IAM Identity Center, Directory Services & Control Tower
+
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 2
+═══════════════════════════════════════════════════════════════════════════════
+
+16. IAM Policy Evaluation Logic
+17. Example IAM Policy Analysis
+18. AWS IAM Identity Center (Introduction)
+19. AWS IAM Identity Center – Login Flow
+20. AWS IAM Identity Center (Architecture)
+21. IAM Identity Center (with AWS Organization)
+22. AWS IAM Identity Center - Fine-grained Permissions and Assignments
+23. What is Microsoft Active Directory (AD)?
+24. AWS Directory Services
+25. IAM Identity Center – Active Directory Setup
+26. AWS Control Tower
+27. AWS Control Tower – Guardrails
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 16: IAM POLICY EVALUATION LOGIC
+
+### The Complete Policy Evaluation Flowchart:
+
+```
+                                    START
+                                      │
+                                      ▼
+                         ┌────────────────────────┐
+                         │ Decision starts        │
+                         │ with Deny              │
+                         └───────────┬────────────┘
+                                     │
+                                     ▼
+                         ┌────────────────────────┐
+                         │ Evaluate all           │
+                         │ applicable policies    │
+                         └───────────┬────────────┘
+                                     │
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   ┌──────────────┐  No   ┌──────────────┐  No   ┌──────────────┐           │
+│   │Is there an   │──────►│Is the account│──────►│Does resource │           │
+│   │explicit Deny?│       │in Org w/ SCP?│       │have policy?  │           │
+│   └──────┬───────┘       └──────┬───────┘       └──────┬───────┘           │
+│          │Yes                   │Yes                   │Yes                │
+│          ▼                      ▼                      ▼                   │
+│   ┌──────────────┐       ┌──────────────┐       ┌──────────────┐           │
+│   │ Final: DENY  │       │Is there an   │       │Is there an   │           │
+│   │(explicit)    │       │Allow in SCP? │       │Allow?        │           │
+│   └──────────────┘       └──────┬───────┘       └──────┬───────┘           │
+│                                 │No                    │No                 │
+│                                 ▼                      ▼                   │
+│                          ┌──────────────┐       ┌──────────────┐           │
+│                          │ Final: DENY  │       │ Final: DENY  │           │
+│                          │(implicit)    │       │(implicit)    │           │
+│                          └──────────────┘       └──────────────┘           │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                     │
+                                     │ (Continue if allowed so far)
+                                     ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   ┌──────────────┐  No   ┌──────────────┐  No   ┌──────────────┐           │
+│   │Does principal│──────►│Does principal│──────►│Is principal a│           │
+│   │have identity │       │have permission│      │session       │           │
+│   │based policy? │       │boundary?      │      │principal?    │           │
+│   └──────┬───────┘       └──────┬───────┘       └──────┬───────┘           │
+│          │Yes                   │Yes                   │                   │
+│          ▼                      ▼                      │                   │
+│   ┌──────────────┐       ┌──────────────┐              │No                 │
+│   │Is there an   │       │Is there an   │              │                   │
+│   │Allow?        │       │Allow?        │              ▼                   │
+│   └──────┬───────┘       └──────┬───────┘       ┌──────────────┐           │
+│          │No                    │No             │ Final: ALLOW │           │
+│          ▼                      ▼               └──────────────┘           │
+│   ┌──────────────┐       ┌──────────────┐              │Yes                │
+│   │ Final: DENY  │       │ Final: DENY  │              ▼                   │
+│   │(implicit)    │       │(implicit)    │       ┌──────────────┐           │
+│   └──────────────┘       └──────────────┘       │Is this a role│           │
+│                                                 │session?      │           │
+│                                                 └──────┬───────┘           │
+│                                                        │                   │
+│                                           ┌────────────┴────────────┐      │
+│                                           │Yes                     No│      │
+│                                           ▼                         ▼      │
+│                                    ┌───────────┐              ┌───────────┐│
+│                                    │Is there a │              │Final: DENY││
+│                                    │session    │              │(implicit) ││
+│                                    │policy?    │              └───────────┘│
+│                                    └─────┬─────┘                           │
+│                                          │                                 │
+│                                    ┌─────┴─────┐                           │
+│                                    │Yes       No│                          │
+│                                    ▼           ▼                           │
+│                             ┌───────────┐ ┌──────────┐                     │
+│                             │Is there   │ │Final:    │                     │
+│                             │Allow?     │ │ALLOW     │                     │
+│                             └─────┬─────┘ └──────────┘                     │
+│                                   │No                                      │
+│                                   ▼                                        │
+│                            ┌───────────┐                                   │
+│                            │Final: DENY│                                   │
+│                            │(implicit) │                                   │
+│                            └───────────┘                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Simplified Evaluation Order:
+
+```
+STEP    CHECK                          RESULT IF FAILED
+────────────────────────────────────────────────────────────────────
+1       Explicit Deny?             →   If yes, DENY (stop)
+2       Organization SCP Allow?    →   If no allow, DENY
+3       Resource-based policy?     →   Check for allow
+4       Identity-based policy?     →   If no allow, DENY
+5       Permission boundary?       →   If no allow, DENY
+6       Session policy?            →   If no allow, DENY
+────────────────────────────────────────────────────────────────────
+        If all checks pass        →   ALLOW
+```
+
+### Key Rules:
+
+```
+1. EXPLICIT DENY ALWAYS WINS
+   - If there's an explicit Deny anywhere, access is denied
+   - No amount of Allows can override an explicit Deny
+
+2. DEFAULT IS DENY
+   - Everything is denied by default
+   - Must have explicit Allow
+
+3. ALLOW REQUIRED AT EACH LEVEL
+   - For Organizations: SCP must allow
+   - For identity: Identity policy must allow
+   - For boundary: Boundary must allow
+   
+4. INTERSECTION
+   - Effective permissions = intersection of all policies
+   - Must be allowed by ALL applicable policies
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 17: EXAMPLE IAM POLICY ANALYSIS
+
+### Given Policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sqs:*",
+      "Effect": "Deny",
+      "Resource": "*"
+    },
+    {
+      "Action": [
+        "sqs:DeleteQueue"
+      ],
+      "Effect": "Allow",
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+### Analysis Questions:
+
+### Question 1: Can you perform sqs:CreateQueue?
+
+```
+ANALYSIS:
+1. First statement: Deny sqs:* → Denies ALL SQS actions
+2. sqs:CreateQueue is covered by sqs:*
+3. Explicit Deny → DENIED
+
+ANSWER: ❌ NO - Explicitly denied by first statement
+```
+
+### Question 2: Can you perform sqs:DeleteQueue?
+
+```
+ANALYSIS:
+1. First statement: Deny sqs:* → Denies ALL SQS actions
+2. Second statement: Allow sqs:DeleteQueue
+3. But explicit Deny ALWAYS wins over Allow
+4. Explicit Deny → DENIED
+
+ANSWER: ❌ NO - Explicit Deny wins over Allow
+```
+
+### Question 3: Can you perform ec2:DescribeInstances?
+
+```
+ANALYSIS:
+1. First statement: Only applies to sqs:*
+2. Second statement: Only applies to sqs:DeleteQueue
+3. Neither statement mentions EC2
+4. No explicit Allow for EC2
+5. Default is DENY
+
+ANSWER: ❌ NO - Not explicitly allowed (implicit deny)
+```
+
+### Summary:
+
+```
+ACTION                  RESULT      REASON
+────────────────────────────────────────────────────────────────
+sqs:CreateQueue     →   DENY    →   Explicit Deny (sqs:*)
+sqs:DeleteQueue     →   DENY    →   Explicit Deny wins over Allow
+ec2:DescribeInstances→  DENY    →   Not allowed (implicit deny)
+```
+
+### Key Lesson:
+
+```
+⚠️ EXPLICIT DENY ALWAYS WINS!
+
+Even though sqs:DeleteQueue has an Allow statement,
+the Deny sqs:* takes precedence.
+
+Order of statements doesn't matter - Deny always wins.
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 18: AWS IAM IDENTITY CENTER
+
+### Formerly Known As:
+AWS IAM Identity Center is the successor to AWS Single Sign-On (AWS SSO)
+
+### One Login for All:
+
+1. AWS ACCOUNTS IN AWS ORGANIZATIONS
+   - Access all accounts with single login
+   - No need to log into each account separately
+   - Centralized access management
+
+2. BUSINESS CLOUD APPLICATIONS
+   - Salesforce
+   - Box
+   - Microsoft 365
+   - And more SaaS applications
+
+3. SAML2.0-ENABLED APPLICATIONS
+   - Custom applications
+   - Any SAML 2.0 compatible app
+   - Enterprise applications
+
+4. EC2 WINDOWS INSTANCES
+   - Windows instance login
+   - Domain join
+   - Centralized Windows access
+
+### Identity Providers:
+
+1. BUILT-IN IDENTITY STORE
+   - Built-in identity store in IAM Identity Center
+   - Create users directly in AWS
+   - Managed by AWS
+
+2. THIRD-PARTY PROVIDERS
+   - Active Directory (AD)
+   - OneLogin
+   - Okta
+   - Azure AD
+   - And more...
+
+### Architecture Overview:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    IAM IDENTITY CENTER                          │
+│                                                                 │
+│   ┌───────────────────┐          ┌───────────────────┐         │
+│   │ Identity Source   │          │  Permission Sets  │         │
+│   │                   │          │                   │         │
+│   │ • Built-in Store  │          │  Define what      │         │
+│   │ • Active Directory│          │  users can do     │         │
+│   │ • Okta            │          │                   │         │
+│   └───────────────────┘          └───────────────────┘         │
+│                                                                 │
+│           Access to:                                            │
+│   • AWS Accounts (Organizations)                                │
+│   • Business Apps (Salesforce, Box)                             │
+│   • SAML 2.0 Apps                                               │
+│   • EC2 Windows Instances                                       │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 19: AWS IAM IDENTITY CENTER – LOGIN FLOW
+
+### User Experience:
+
+### Step 1: Sign In Page
+
+```
+┌─────────────────────────────────────┐
+│                                     │
+│              aws                    │
+│                                     │
+│           Sign in                   │
+│                                     │
+│   Username                          │
+│   ┌─────────────────────────────┐   │
+│   │ stephane                    │   │
+│   └─────────────────────────────┘   │
+│                                     │
+│   ☐ Remember username              │
+│                                     │
+│   ┌─────────────────────────────┐   │
+│   │          Next               │   │
+│   └─────────────────────────────┘   │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+### Step 2: AWS Account Selection Portal
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                 AWS IAM Identity Center                         │
+│                                                                 │
+│   ┌───────────────────────────────────────────────────────────┐ │
+│   │  AWS Account (4)                                          │ │
+│   ├───────────────────────────────────────────────────────────┤ │
+│   │                                                           │ │
+│   │  🔒 AWS Courses                                           │ │
+│   │     #783746093452                                         │ │
+│   │     AdministratorAccess                                   │ │
+│   │     [Management console] [Command line or programmatic]   │ │
+│   │                                                           │ │
+│   │  🔒 datacumulus-main                                      │ │
+│   │     #387374203561                                         │ │
+│   │                                                           │ │
+│   │  🔒 Stéphane MAAREK                                       │ │
+│   │     #160803648315                                         │ │
+│   │                                                           │ │
+│   │  🔒 stephane-ccp                                          │ │
+│   │     #855174973723                                         │ │
+│   │                                                           │ │
+│   └───────────────────────────────────────────────────────────┘ │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Step 3: Access AWS Console
+
+After selecting an account, user is logged into the AWS Console with 
+the appropriate permissions.
+
+### Login Flow:
+
+```
+USER                    IAM IDENTITY CENTER              AWS
+────────────────────────────────────────────────────────────────
+
+1. Enter username/password
+        │
+        └──────────────────►  Authenticate user
+                                      │
+                              ┌───────┴───────┐
+                              │               │
+                         Verify with     Check built-in
+                         external IdP    identity store
+                              │               │
+                              └───────┬───────┘
+                                      │
+                              List available accounts
+                                      │
+        ◄─────────────────────────────┘
+2. Select account                    
+        │
+        └──────────────────►  Generate credentials
+                                      │
+                                      └───────────────► AWS Console
+                                                           │
+        ◄──────────────────────────────────────────────────┘
+3. Access AWS Console with appropriate permissions
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 20: AWS IAM IDENTITY CENTER - ARCHITECTURE
+
+### Complete Architecture:
+
+```
+┌──────────────────┐
+│ Browser          │
+│ Interface        │
+└────────┬─────────┘
+         │
+         │ login
+         ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      AWS IAM IDENTITY CENTER                                │
+│                                                                             │
+│  ┌─────────────────┐     ┌─────────────────┐                               │
+│  │     Identity    │     │   Permission    │                               │
+│  │     Center      │     │     Sets        │                               │
+│  └─────────────────┘     └─────────────────┘                               │
+│                                                                             │
+│           Store / retrieve                                                  │
+│           User identities                                                   │
+│                  │                                                          │
+│    ┌─────────────┴─────────────┐                                           │
+│    │                           │                                           │
+│    ▼                           ▼                                           │
+│ ┌──────────────────┐    ┌──────────────────┐                               │
+│ │ Active Directory │    │ IAM Identity     │                               │
+│ │ Users & groups   │    │ Center           │                               │
+│ │ (On-prem, cloud) │    │ Built-in Store   │                               │
+│ │                  │    │                  │                               │
+│ │ [Microsoft AD]   │    │ [Database icon]  │                               │
+│ └──────────────────┘    └──────────────────┘                               │
+│                                                                             │
+└────────────────────────────────────────────┬────────────────────────────────┘
+                                             │
+                                             │ SSO
+                                             ▼
+              ┌──────────────────────────────────────────────────────┐
+              │                                                      │
+              │  ┌──────────────────────────────────────────────┐    │
+              │  │              AWS Cloud                       │    │
+              │  │                                              │    │
+              │  │  ┌─────────────┐   ┌─────────────────────┐   │    │
+              │  │  │    AWS      │   │    Windows EC2      │   │    │
+              │  │  │Organization │   │    Instances        │   │    │
+              │  │  └─────────────┘   └─────────────────────┘   │    │
+              │  └──────────────────────────────────────────────┘    │
+              │                                                      │
+              │  ┌──────────────────────────────────────────────┐    │
+              │  │         Business Cloud Apps                  │    │
+              │  │                                              │    │
+              │  │  [Salesforce] [Box] [Slack]                  │    │
+              │  │  [Microsoft 365] [Dropbox]                   │    │
+              │  └──────────────────────────────────────────────┘    │
+              │                                                      │
+              │  ┌──────────────────────────────────────────────┐    │
+              │  │       Custom SAML2.0-enabled Apps            │    │
+              │  │                                              │    │
+              │  │  [App 1] [App 2]                             │    │
+              │  └──────────────────────────────────────────────┘    │
+              │                                                      │
+              └──────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 21: IAM IDENTITY CENTER WITH AWS ORGANIZATION
+
+### Integration with AWS Organizations:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            AWS Organization                                 │
+│                                                                             │
+│      ┌─────────────────────────────────────────────────────────────────┐    │
+│      │                    Management Account                           │    │
+│      │                                                                 │    │
+│      │  ┌───────────────────────────────────────────────────────────┐  │    │
+│      │  │              IAM Identity Center                          │  │    │
+│      │  │             (in Management account)                       │  │    │
+│      │  │                                                           │  │    │
+│      │  │   Group (Developers)                                      │  │    │
+│      │  │   ┌─────────┐  ┌─────────┐                                │  │    │
+│      │  │   │   Bob   │  │  Alice  │                                │  │    │
+│      │  │   └────┬────┘  └────┬────┘                                │  │    │
+│      │  │        │            │                                     │  │    │
+│      │  │        │   assign   │   assign                            │  │    │
+│      │  │        │            │                                     │  │    │
+│      │  │        ▼            ▼                                     │  │    │
+│      │  │   ┌──────────────────────┐                                │  │    │
+│      │  │   │ Permission Set       │                                │  │    │
+│      │  │   │ ReadOnlyAccess       │                                │  │    │
+│      │  │   └──────────────────────┘                                │  │    │
+│      │  │   ┌──────────────────────┐                                │  │    │
+│      │  │   │ Permission Set       │◄── Alice only                  │  │    │
+│      │  │   │ FullAccess           │                                │  │    │
+│      │  │   └──────────────────────┘                                │  │    │
+│      │  └───────────────────────────────────────────────────────────┘  │    │
+│      │                                                                 │    │
+│      └─────────────────────────────────────────────────────────────────┘    │
+│                                                                             │
+│   ┌──────────────────────┐            ┌──────────────────────┐              │
+│   │  OU (Development)    │            │  OU (Production)     │              │
+│   │                      │            │                      │              │
+│   │  ┌────────────────┐  │            │  ┌────────────────┐  │              │
+│   │  │ Dev Account A  │  │◄───────────│  │ Prod Account A │  │              │
+│   │  └────────────────┘  │ Permission │  └────────────────┘  │              │
+│   │  ┌────────────────┐  │    Sets    │  ┌────────────────┐  │              │
+│   │  │ Dev Account B  │  │   applied  │  │ Prod Account B │  │              │
+│   │  └────────────────┘  │            │  └────────────────┘  │              │
+│   │                      │            │                      │              │
+│   └──────────────────────┘            └──────────────────────┘              │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### How It Works:
+
+1. IAM Identity Center is set up in Management Account
+2. Users and Groups are created (or synced from AD)
+3. Permission Sets define what users can do
+4. Permission Sets are assigned to users/groups for specific accounts/OUs
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 22: AWS IAM IDENTITY CENTER - FINE-GRAINED PERMISSIONS
+
+### Three Key Features:
+
+### 1. MULTI-ACCOUNT PERMISSIONS
+
+- Manage access across AWS accounts in your AWS Organization
+- Permission Sets: A collection of one or more IAM Policies
+- Assigned to users and groups
+- Defines AWS access
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     AWS Organization                            │
+│                                                                 │
+│   ┌─────────────────┐        ┌─────────────────┐               │
+│   │  Dev Account    │        │  Prod Account   │               │
+│   │                 │        │                 │               │
+│   │  ┌───────────┐  │        │  ┌───────────┐  │               │
+│   │  │   RDS     │  │        │  │   RDS     │  │               │
+│   │  │  Aurora   │  │        │  │  Aurora   │  │               │
+│   │  └───────────┘  │        │  └───────────┘  │               │
+│   │                 │        │                 │               │
+│   │   IAM Role      │        │   IAM Role      │               │
+│   └────────┬────────┘        └────────┬────────┘               │
+│            │                          │                        │
+│            │         assume           │                        │
+│            └────────────┬─────────────┘                        │
+│                         │                                      │
+│                         ▼                                      │
+│               ┌───────────────────┐                            │
+│               │  Permission Sets  │                            │
+│               │   (DB Admins)     │                            │
+│               └─────────┬─────────┘                            │
+│                         │                                      │
+│                         │                                      │
+│            ┌────────────┴────────────┐                         │
+│            │    Database Admins      │                         │
+│            │    (User Group)         │                         │
+│            └─────────────────────────┘                         │
+│                         │                                      │
+│                         │                                      │
+│                   IAM Identity Center                          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2. APPLICATION ASSIGNMENTS
+
+- SSO access to many SAML 2.0 business applications
+- Examples: Salesforce, Box, Microsoft 365
+- Provide required URLs, certificates, and metadata
+- Configure once, access everywhere
+
+### 3. ATTRIBUTE-BASED ACCESS CONTROL (ABAC)
+
+- Fine-grained permissions based on users' attributes
+- Stored in IAM Identity Center Identity Store
+- Examples: cost center, title, locale
+
+```
+ABAC EXAMPLE:
+─────────────────────────────────────────────────────────────────
+User Attribute: Department = "Finance"
+Permission: Access only resources with tag Department = "Finance"
+
+USE CASE:
+- Define permissions once
+- Modify AWS access by changing the attributes
+- No policy changes needed
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 23: WHAT IS MICROSOFT ACTIVE DIRECTORY (AD)?
+
+### Overview:
+
+Microsoft Active Directory is found on any Windows Server with 
+AD Domain Services installed.
+
+### Key Components:
+
+1. DATABASE OF OBJECTS
+   - User Accounts
+   - Computers
+   - Printers
+   - File Shares
+   - Security Groups
+
+2. CENTRALIZED SECURITY MANAGEMENT
+   - Create accounts
+   - Assign permissions
+   - Manage access centrally
+
+3. ORGANIZATIONAL STRUCTURE
+   - Objects are organized in TREES
+   - A group of trees is a FOREST
+   - Hierarchical structure
+
+### How It Works:
+
+```
+                    ┌─────────────────────┐
+                    │  Domain Controller  │
+                    │                     │
+                    │   Active Directory  │
+                    │   Database          │
+                    └──────────┬──────────┘
+                               │
+                               │ John
+                               │ Password
+                               │
+            ┌──────────────────┼──────────────────┐
+            │                  │                  │
+            ▼                  ▼                  ▼
+       ┌─────────┐        ┌─────────┐        ┌─────────┐
+       │   PC    │        │   PC    │        │   PC    │
+       │         │        │         │        │         │
+       └─────────┘        └─────────┘        └─────────┘
+       
+       Users log in with their AD credentials
+       Domain Controller authenticates them
+```
+
+### Terminology:
+
+```
+TERM              DESCRIPTION
+────────────────────────────────────────────────────────────────
+Domain        →   Collection of objects (users, computers)
+Domain        →   Server running AD DS
+Controller
+Tree          →   Hierarchy of domains
+Forest        →   Collection of trees
+Trust         →   Relationship between domains/forests
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 24: AWS DIRECTORY SERVICES
+
+### Three Types of Directory Services:
+
+### 1. AWS MANAGED MICROSOFT AD
+
+```
+┌───────────────────┐   trust   ┌───────────────────┐
+│   On-prem AD      │◄─────────►│ AWS Managed AD    │
+│                   │           │                   │
+│   ┌─────────┐     │   auth    │     ┌─────────┐   │
+│   │  Users  │ ◄───┼───────────┼───► │  Users  │   │
+│   └─────────┘     │           │     └─────────┘   │
+└───────────────────┘           └───────────────────┘
+```
+
+**Features:**
+- Create your own AD in AWS
+- Manage users locally in AWS
+- Supports MFA
+- Establish "trust" connections with your on-premises AD
+- Users can authenticate against either directory
+
+### 2. AD CONNECTOR
+
+```
+┌───────────────────┐  proxy   ┌───────────────────┐
+│   On-prem AD      │◄────────►│   AD Connector    │
+│                   │          │                   │
+│   ┌─────────┐     │   auth   │   (No local      │
+│   │  Users  │ ◄───┼──────────┤    users)        │
+│   └─────────┘     │          │                   │
+└───────────────────┘          └───────────────────┘
+```
+
+**Features:**
+- Directory Gateway (PROXY) to redirect to on-premises AD
+- Supports MFA
+- Users are managed on the on-premises AD
+- No caching of users in AWS
+- All authentication goes to on-prem
+
+### 3. SIMPLE AD
+
+```
+┌───────────────────┐
+│    Simple AD      │
+│                   │
+│  ┌─────────────┐  │
+│  │   Users     │  │
+│  │  (AWS only) │  │
+│  └─────────────┘  │
+│                   │
+│  Cannot join with │
+│  on-premises AD   │
+│                   │
+└───────────────────┘
+```
+
+**Features:**
+- AD-compatible managed directory on AWS
+- Cannot be joined with on-premises AD
+- Standalone directory
+- Lower cost option
+- For simple use cases
+
+### Comparison:
+
+```
+SERVICE              ON-PREM CONNECTION    USER MANAGEMENT
+────────────────────────────────────────────────────────────────
+AWS Managed AD   →   Trust relationship →  Both AWS and on-prem
+AD Connector     →   Proxy/redirect    →  On-premises only
+Simple AD        →   No connection     →  AWS only
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 25: IAM IDENTITY CENTER – ACTIVE DIRECTORY SETUP
+
+### Two Connection Options:
+
+### Option 1: Connect to AWS Managed Microsoft AD
+
+**Simplest Integration:**
+
+```
+┌─────────────────────┐    connect    ┌─────────────────────┐
+│   IAM Identity      │──────────────►│  AWS Managed        │
+│   Center            │               │  Microsoft AD       │
+│                     │               │                     │
+└─────────────────────┘               └─────────────────────┘
+
+• Integration is out of the box
+• Direct connection
+• No additional configuration needed
+```
+
+### Option 2: Connect to a Self-Managed Directory
+
+**Two approaches:**
+
+**Approach A: Two-way Trust with AWS Managed AD**
+
+```
+┌─────────────────────┐    connect    ┌─────────────────────┐
+│   IAM Identity      │──────────────►│  AWS Managed        │
+│   Center            │               │  Microsoft AD       │
+└─────────────────────┘               └──────────┬──────────┘
+                                                 │
+                                      two-way trust relationship
+                                                 │
+                                                 ▼
+                                      ┌─────────────────────┐
+                                      │   On-premises       │
+                                      │   Active Directory  │
+                                      └─────────────────────┘
+```
+
+**Approach B: Use AD Connector**
+
+```
+┌─────────────────────┐    connect    ┌─────────────────────┐
+│   IAM Identity      │──────────────►│   AD Connector      │
+│   Center            │               │      (proxy)        │
+└─────────────────────┘               └──────────┬──────────┘
+                                                 │
+                                               proxy
+                                                 │
+                                                 ▼
+                                      ┌─────────────────────┐
+                                      │   On-premises       │
+                                      │   Active Directory  │
+                                      └─────────────────────┘
+```
+
+### Choosing the Right Option:
+
+```
+SCENARIO                                        SOLUTION
+────────────────────────────────────────────────────────────────────
+AWS-only users                              →   AWS Managed AD (direct)
+Existing on-prem AD, need local users too   →   AWS Managed AD + Trust
+Existing on-prem AD, all users there        →   AD Connector
+Small/simple deployment, no on-prem         →   Simple AD
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 26: AWS CONTROL TOWER
+
+### Concept:
+AWS Control Tower is an easy way to set up and govern a secure and compliant 
+multi-account AWS environment based on best practices.
+
+### Key Features:
+
+1. USES AWS ORGANIZATIONS
+   - AWS Control Tower uses AWS Organizations to create accounts
+   - Leverages existing Organizations features
+   - Built on top of Organizations
+
+2. AUTOMATED SETUP
+   - Automate the set up of your environment in a few clicks
+   - Landing zone with best practices
+   - Pre-configured structure
+
+3. AUTOMATED POLICY MANAGEMENT
+   - Automate ongoing policy management using guardrails
+   - Continuous compliance
+   - Automatic enforcement
+
+4. DETECT AND REMEDIATE
+   - Detect policy violations and remediate them
+   - Automatic detection
+   - Guided remediation
+
+5. COMPLIANCE MONITORING
+   - Monitor compliance through an interactive dashboard
+   - Visual overview
+   - Real-time status
+
+### Benefits:
+
+```
+WITHOUT CONTROL TOWER:              WITH CONTROL TOWER:
+─────────────────────────────────────────────────────────────────
+Manual account setup            →   Automated landing zone
+Ad-hoc policies                →   Consistent guardrails
+No compliance visibility       →   Interactive dashboard
+Manual remediation             →   Automated responses
+Inconsistent governance        →   Best practices built-in
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 27: AWS CONTROL TOWER – GUARDRAILS
+
+### Concept:
+Guardrails provide ongoing governance for your Control Tower environment 
+(AWS Accounts).
+
+### Two Types of Guardrails:
+
+### 1. PREVENTIVE GUARDRAIL
+
+**Method:** Using SCPs (Service Control Policies)
+
+**Purpose:** PREVENT non-compliant actions
+
+**Example:** Restrict Regions across all your accounts
+
+```
+PREVENTIVE GUARDRAIL:
+─────────────────────────────────────────────────────────────────
+Action: BLOCK
+Enforcement: SCP
+Example: "Prevent users from launching EC2 in certain regions"
+
+If user tries → Action is DENIED before it happens
+```
+
+### 2. DETECTIVE GUARDRAIL
+
+**Method:** Using AWS Config
+
+**Purpose:** DETECT non-compliant resources
+
+**Example:** Identify untagged resources
+
+```
+DETECTIVE GUARDRAIL:
+─────────────────────────────────────────────────────────────────
+Action: ALERT
+Enforcement: AWS Config Rules
+Example: "Identify resources without required tags"
+
+If resource exists without tags → Alert is generated
+```
+
+### Detective Guardrail Architecture:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        AWS Control Tower                                    │
+│                                                                             │
+│   ┌───────────────────────────────────────────────────────────────────┐     │
+│   │  Guardrail (Detective)           AWS Config                       │     │
+│   │       │                              │                            │     │
+│   │       │                              │ monitor un-tagged          │     │
+│   │       │                              │ resources                  │     │
+│   │       │                              ▼                            │     │
+│   │       │                     ┌────────────────┐                    │     │
+│   │       │                     │ Member         │                    │     │
+│   │       │                     │ Accounts       │                    │     │
+│   │       │                     │ ┌──┐ ┌──┐ ┌──┐ │                    │     │
+│   │       │                     │ └──┘ └──┘ └──┘ │                    │     │
+│   │       │                     └────────────────┘                    │     │
+│   │       │                              │                            │     │
+│   │       │ trigger                      │                            │     │
+│   │       │ (NON_COMPLIANT)              │                            │     │
+│   │       ▼                              │                            │     │
+│   │   ┌───────────┐                      │                            │     │
+│   │   │   SNS     │                      │                            │     │
+│   │   └─────┬─────┘                      │                            │     │
+│   │         │                            │                            │     │
+│   │    ┌────┴────┐                       │                            │     │
+│   │    │         │                       │                            │     │
+│   │    ▼         ▼                       │                            │     │
+│   │ ┌──────┐  ┌───────┐      remediate   │                            │     │
+│   │ │Admin │  │Lambda │─────────────────►│                            │     │
+│   │ │notify│  │(add   │      (add tags)  │                            │     │
+│   │ └──────┘  │ tags) │                  │                            │     │
+│   │           └───────┘                  │                            │     │
+│   │                                                                   │     │
+│   └───────────────────────────────────────────────────────────────────┘     │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Guardrails Comparison:
+
+```
+TYPE          METHOD         ACTION           TIMING        EXAMPLE
+────────────────────────────────────────────────────────────────────────────
+Preventive →  SCP        →   Block action  →  Before     → Restrict regions
+Detective  →  AWS Config →   Alert/Report  →  After      → Find untagged
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                            SUMMARY & EXAM TIPS
+═══════════════════════════════════════════════════════════════════════════════
+
+### Quick Reference:
+
+```
+SERVICE/FEATURE                    KEY POINT
+────────────────────────────────────────────────────────────────────────────
+AWS Organizations           →   Multi-account management
+SCPs                        →   Guardrails for OUs/Accounts (not mgmt acct)
+Tag Policies               →   Enforce tagging standards
+IAM Conditions             →   Restrict by IP, region, tags, MFA
+Permission Boundaries      →   Max permissions for users/roles
+IAM Policy Evaluation      →   Explicit Deny wins, default is Deny
+IAM Identity Center        →   SSO for AWS accounts & apps
+Permission Sets            →   Define what users can do
+Active Directory           →   Microsoft identity service
+AWS Managed AD             →   AD in AWS with trust to on-prem
+AD Connector               →   Proxy to on-prem AD
+Simple AD                  →   Standalone AD in AWS
+Control Tower              →   Multi-account governance
+Preventive Guardrails      →   SCPs to block actions
+Detective Guardrails       →   AWS Config to detect issues
+```
+
+### Exam Tips:
+
+```
+✓ SCPs do NOT apply to Management Account
+✓ Explicit Deny ALWAYS wins in IAM
+✓ Permission Boundaries = maximum permissions
+✓ IAM Identity Center = successor to AWS SSO
+✓ AD Connector = proxy (no local users)
+✓ AWS Managed AD = trust relationship with on-prem
+✓ Simple AD = cannot connect to on-prem
+✓ Preventive Guardrails use SCPs
+✓ Detective Guardrails use AWS Config
+✓ aws:PrincipalOrgID = restrict to org members
+✓ S3: bucket-level (no /*) vs object-level (/*)
+```
+
+### Common Scenarios:
+
+```
+SCENARIO                                         SOLUTION
+────────────────────────────────────────────────────────────────────────────
+SSO across multiple AWS accounts             →   IAM Identity Center
+Restrict services in member accounts         →   SCPs
+Limit user permissions (single user)         →   Permission Boundaries
+Detect untagged resources                    →   Detective Guardrail
+Block region usage                           →   Preventive Guardrail
+Integrate existing on-prem AD                →   AD Connector or Managed AD
+Cross-account S3 access keeping permissions  →   Resource-based Policy
+Require MFA for destructive actions          →   aws:MultiFactorAuthPresent
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                                  END OF GUIDE
+═══════════════════════════════════════════════════════════════════════════════
