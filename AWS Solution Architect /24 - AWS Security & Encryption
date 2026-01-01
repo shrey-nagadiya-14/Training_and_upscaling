@@ -1,1 +1,2144 @@
+# AWS SECURITY & ENCRYPTION - COMPLETE GUIDE (PART 1)
+## KMS, Encryption SDK, SSM Parameter Store, Secrets Manager
 
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+1. AWS Security & Encryption (Overview)
+2. Encryption in Flight (TLS/SSL)
+3. Server-side Encryption at Rest
+4. Client-side Encryption
+5. AWS KMS (Key Management Service)
+6. KMS Keys Types
+7. AWS KMS (Types of Keys and Rotation)
+8. Copying Snapshots across Regions
+9. KMS Key Policies
+10. Copying Snapshots across Accounts
+11. KMS Multi-Region Keys (Architecture)
+12. KMS Multi-Region Keys (Features)
+13. DynamoDB Global Tables and KMS Multi-Region Keys
+14. Global Aurora and KMS Multi-Region Keys
+15. S3 Replication Encryption Considerations
+16. AMI Sharing Process Encrypted via KMS
+17. SSM Parameter Store
+18. SSM Parameter Store Hierarchy
+19. Standard and Advanced Parameter Tiers
+20. Parameters Policies (for advanced parameters)
+21. AWS Secrets Manager
+22. AWS Secrets Manager – Multi-Region Secrets
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 1: AWS SECURITY & ENCRYPTION
+
+### Title Slide Overview:
+
+This section covers AWS security and encryption services:
+
+1. KMS (Key Management Service)
+   - Key management
+   - Encryption/Decryption
+   - Key rotation
+
+2. ENCRYPTION SDK
+   - Client-side encryption
+   - Envelope encryption
+
+3. SSM PARAMETER STORE
+   - Configuration management
+   - Secrets storage
+   - Hierarchical storage
+
+4. SECRETS MANAGER
+   - Secrets rotation
+   - RDS integration
+
+### Why Security Matters:
+
+```
+DATA PROTECTION REQUIREMENTS:
+─────────────────────────────────────────────────────────────────
+- Data at rest encryption (storage)
+- Data in transit encryption (network)
+- Key management
+- Access control
+- Audit trails
+- Compliance (HIPAA, PCI-DSS, etc.)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 2: WHY ENCRYPTION? - ENCRYPTION IN FLIGHT (TLS/SSL)
+
+### Concept:
+Encryption in flight protects data as it travels over the network 
+using TLS (Transport Layer Security) or SSL.
+
+### Key Points:
+
+1. DATA IS ENCRYPTED BEFORE SENDING
+   - Data is encrypted before sending
+   - And decrypted after receiving
+   - Secure during transmission
+
+2. TLS CERTIFICATES
+   - TLS certificates help with encryption (HTTPS)
+   - Server presents certificate to client
+   - Establishes encrypted connection
+
+3. NO MITM ATTACKS
+   - Encryption in flight ensures no MITM (man in the middle attack)
+   - Attackers cannot read the data
+   - Even if they intercept it
+
+### Architecture:
+
+```
+ENCRYPTION IN FLIGHT:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│    CLIENT                                                     SERVER        │
+│                                                                             │
+│  ┌─────────┐     Username: admin      ┌───────┐              ┌───────────┐  │
+│  │         │     Password: supersecret│       │              │           │  │
+│  │  User   │─────────────────────────►│  TLS  │              │   HTTPS   │  │
+│  │         │                          │Encrypt│              │  Website  │  │
+│  └─────────┘                          │  🔒   │              │           │  │
+│                                       └───┬───┘              └─────┬─────┘  │
+│                                           │                        │        │
+│                                           │ aGVsbG8gd29ybGQ=       │        │
+│                                           │ (encrypted)            │        │
+│                                           │                        │        │
+│                                           └───────────────────────►│        │
+│                                                                    │        │
+│                                                              ┌─────┴─────┐  │
+│                                                              │    TLS    │  │
+│                                                              │  Decrypt  │  │
+│                                                              │    🔓     │  │
+│                                                              └─────┬─────┘  │
+│                                                                    │        │
+│                                                      Username: admin        │
+│                                                      Password: supersecret  │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Real-World Example:
+
+```
+HTTPS Connection:
+1. You type https://bank.com
+2. Browser requests server certificate
+3. Server sends TLS certificate
+4. Browser verifies certificate
+5. Encrypted session established
+6. All data encrypted during transfer
+7. Attackers see only gibberish
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 3: WHY ENCRYPTION? - SERVER-SIDE ENCRYPTION AT REST
+
+### Concept:
+Server-side encryption protects data when it's stored on the server, 
+with encryption happening after receipt and decryption before sending.
+
+### Key Points:
+
+1. DATA IS ENCRYPTED AFTER BEING RECEIVED
+   - Data is encrypted after being received by the server
+   - Server performs the encryption
+   - Transparent to the client
+
+2. DATA IS DECRYPTED BEFORE BEING SENT
+   - Data is decrypted before being sent back
+   - Client receives unencrypted data
+   - Encryption/decryption is server's responsibility
+
+3. STORED IN ENCRYPTED FORM
+   - It is stored in an encrypted form
+   - Thanks to a key (usually a data key)
+   - Even if storage is compromised, data is safe
+
+4. KEY MANAGEMENT
+   - The encryption / decryption keys must be managed somewhere
+   - And the server must have access to it
+   - Usually AWS KMS
+
+### Architecture:
+
+```
+SERVER-SIDE ENCRYPTION AT REST:
+
+┌──────────┐                                                    ┌──────────┐
+│          │                                                    │          │
+│  Object  │                                                    │  Object  │
+│  (File)  │                                                    │  (File)  │
+│          │                                                    │          │
+└────┬─────┘                                                    └────▲─────┘
+     │                                                               │
+     │ HTTP(S)                                                 HTTP(S)
+     ▼                                                               │
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         AWS Service (e.g., S3)                              │
+│                                                                             │
+│   ┌────────────┐      ┌─────────────┐      ┌────────────┐                  │
+│   │            │      │             │      │            │                  │
+│   │   Data     │ ──►  │  Encrypted  │  ◄── │   Data     │                  │
+│   │   + Key    │      │    Data     │      │   + Key    │                  │
+│   │            │      │             │      │            │                  │
+│   │ Encryption │      │   Stored    │      │ Decryption │                  │
+│   │    🔒      │      │             │      │    🔓      │                  │
+│   └────────────┘      └─────────────┘      └────────────┘                  │
+│         │                                        │                         │
+│         └────────────────┬───────────────────────┘                         │
+│                          │                                                 │
+│                          ▼                                                 │
+│                    ┌───────────┐                                           │
+│                    │  Data Key │                                           │
+│                    │    🔑     │                                           │
+│                    └───────────┘                                           │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 4: WHY ENCRYPTION? - CLIENT-SIDE ENCRYPTION
+
+### Concept:
+Client-side encryption means data is encrypted by the client before 
+sending, and the server never sees the unencrypted data.
+
+### Key Points:
+
+1. ENCRYPTED BY THE CLIENT
+   - Data is encrypted by the client
+   - And never decrypted by the server
+   - Maximum security
+
+2. DECRYPTED BY RECEIVING CLIENT
+   - Data will be decrypted by a receiving client
+   - Who has the key
+   - End-to-end encryption
+
+3. SERVER CANNOT DECRYPT
+   - The server should not be able to decrypt the data
+   - Even if compromised
+   - Zero-knowledge
+
+4. ENVELOPE ENCRYPTION
+   - Could leverage Envelope Encryption
+   - Encrypt data key with master key
+   - Common pattern
+
+### Architecture:
+
+```
+CLIENT-SIDE ENCRYPTION:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                CLIENT                                       │
+│                                                                             │
+│   ┌──────────┐      ┌───────────┐      ┌─────────────┐                     │
+│   │          │      │  Data Key │      │             │                     │
+│   │  Object  │  +   │(client-   │ ───► │  Encrypted  │                     │
+│   │          │      │  side)    │      │   Object    │                     │
+│   │          │      │    🔑     │      │     🔒      │                     │
+│   └──────────┘      └───────────┘      └──────┬──────┘                     │
+│                                               │                             │
+│                                               │ store                       │
+│                                               ▼                             │
+│   ┌──────────┐      ┌───────────┐      ┌─────────────────────────────────┐ │
+│   │          │      │  Data Key │      │       Any Storage Service       │ │
+│   │  Object  │ ◄──  │(client-   │ ◄─── │                                 │ │
+│   │          │      │  side)    │      │   ┌─────────────────────────┐   │ │
+│   │          │      │    🔑     │      │   │    Encrypted Object     │   │ │
+│   └──────────┘      └───────────┘      │   │          🔒             │   │ │
+│                                        │   └─────────────────────────┘   │ │
+│   Decryption                           │                                 │ │
+│                          retrieve      │   (FTP, S3, ...)                │ │
+│                         ◄──────────────│                                 │ │
+│                                        └─────────────────────────────────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Comparison:
+
+```
+ENCRYPTION TYPE        WHO ENCRYPTS       WHO HAS KEY        SECURITY
+─────────────────────────────────────────────────────────────────────────
+In Flight          →   TLS/SSL        →   Both ends      →   Network security
+Server-side        →   Server         →   Server (KMS)   →   Storage security
+Client-side        →   Client         →   Client only    →   End-to-end
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 5: AWS KMS (KEY MANAGEMENT SERVICE)
+
+### Concept:
+AWS KMS is a managed service that makes it easy to create and control 
+encryption keys used to encrypt your data.
+
+### Key Points:
+
+1. ANYTIME YOU HEAR "ENCRYPTION"
+   - Anytime you hear "encryption" for an AWS service
+   - It's most likely KMS
+   - The default encryption service
+
+2. AWS MANAGES KEYS
+   - AWS manages encryption keys for us
+   - Secure key storage
+   - Hardware Security Modules (HSMs)
+
+3. FULLY INTEGRATED WITH IAM
+   - Fully integrated with IAM for authorization
+   - Control who can use which keys
+   - Fine-grained permissions
+
+4. EASY ACCESS CONTROL
+   - Easy way to control access to your data
+   - Key policies + IAM policies
+   - Audit with CloudTrail
+
+5. CLOUDTRAIL AUDIT
+   - Able to audit KMS Key usage using CloudTrail
+   - Who used which key and when
+   - Compliance and security
+
+6. SEAMLESS INTEGRATION
+   - Seamlessly integrated into most AWS services
+   - EBS, S3, RDS, SSM...
+   - One-click encryption
+
+7. NEVER STORE SECRETS IN PLAINTEXT
+   - Never ever store your secrets in plaintext, especially in your code!
+   - KMS Key Encryption also available through API calls (SDK, CLI)
+   - Encrypted secrets can be stored in the code / environment variables
+
+### Services Integrated with KMS:
+
+```
+INTEGRATED AWS SERVICES:
+─────────────────────────────────────────────────────────────────
+Storage:        EBS, S3, EFS, Glacier, Storage Gateway
+Database:       RDS, DynamoDB, Redshift, ElastiCache
+Compute:        Lambda (env vars), EC2 (EBS), ECS
+Other:          SSM Parameter Store, Secrets Manager, SQS, SNS
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 6: KMS KEYS TYPES
+
+### Naming Note:
+KMS Keys is the new name of KMS Customer Master Key (CMK)
+
+### 1. SYMMETRIC KEYS (AES-256)
+
+- Single encryption key that is used to Encrypt and Decrypt
+- Same key for both operations
+- AWS services that are integrated with KMS use Symmetric CMKs
+- You never get access to the KMS Key unencrypted
+- Must call KMS API to use
+
+```
+SYMMETRIC KEY:
+─────────────────────────────────────────────────────────────────
+           ┌─────────────────┐
+           │   KMS Key       │
+           │   (AES-256)     │
+           │       🔑        │
+           └────────┬────────┘
+                    │
+          ┌─────────┴─────────┐
+          │                   │
+          ▼                   ▼
+    ┌──────────┐        ┌──────────┐
+    │ Encrypt  │        │ Decrypt  │
+    │    🔒    │        │    🔓    │
+    └──────────┘        └──────────┘
+```
+
+### 2. ASYMMETRIC KEYS (RSA & ECC key pairs)
+
+- Public (Encrypt) and Private Key (Decrypt) pair
+- Two different keys
+- Used for Encrypt/Decrypt, or Sign/Verify operations
+- The public key is downloadable
+- But you can't access the Private Key unencrypted
+
+**Use case:** Encryption outside of AWS by users who can't call the KMS API
+
+```
+ASYMMETRIC KEY:
+─────────────────────────────────────────────────────────────────
+    ┌─────────────────┐        ┌─────────────────┐
+    │   Public Key    │        │  Private Key    │
+    │  (downloadable) │        │ (never leaves   │
+    │       🔑        │        │     KMS)  🔐    │
+    └────────┬────────┘        └────────┬────────┘
+             │                          │
+             ▼                          ▼
+       ┌──────────┐              ┌──────────┐
+       │ Encrypt  │              │ Decrypt  │
+       │    🔒    │              │    🔓    │
+       └──────────┘              └──────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 7: AWS KMS - TYPES OF KEYS AND ROTATION
+
+### Types of KMS Keys:
+
+1. AWS OWNED KEYS (Free)
+   - SSE-S3, SSE-SQS, SSE-DDB (default key)
+   - Managed entirely by AWS
+   - Used by default when you enable encryption
+
+2. AWS MANAGED KEY (Free)
+   - Format: aws/service-name
+   - Example: aws/rds or aws/ebs
+   - Automatic rotation every 1 year
+
+3. CUSTOMER MANAGED KEYS - CREATED IN KMS ($1/month)
+   - You create and manage
+   - Full control over key policy
+   - Can enable/disable
+
+4. CUSTOMER MANAGED KEYS - IMPORTED ($1/month)
+   - Bring your own key material
+   - Must be 256-bit symmetric key
+   - You're responsible for security
+
+5. API CALL PRICING
+   - $0.03 per 10,000 API calls to KMS
+
+### Automatic Key Rotation:
+
+```
+KEY TYPE                    ROTATION
+─────────────────────────────────────────────────────────────────
+AWS-managed KMS Key     →   Automatic every 1 year
+Customer-managed Key    →   Must be enabled, automatic & on-demand
+Imported KMS Key        →   Only manual rotation possible using alias
+```
+
+### Console View:
+
+```
+Encryption key management options:
+─────────────────────────────────────────────────────────────────
+◉ Owned by Amazon DynamoDB          (AWS Owned - Free)
+○ AWS managed key                   (AWS Managed - Free)
+  Key alias: aws/dynamodb
+○ Stored in your account,           (Customer Managed - $1/month)
+  and owned and managed by you
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 8: COPYING SNAPSHOTS ACROSS REGIONS
+
+### Concept:
+When copying KMS-encrypted snapshots across regions, you must re-encrypt 
+with a different KMS key because KMS keys are regional.
+
+### Key Point:
+KMS Keys are bound to a specific region!
+
+### Architecture:
+
+```
+COPYING SNAPSHOTS ACROSS REGIONS:
+
+    Region eu-west-2                          Region ap-southeast-2
+┌───────────────────────────────┐        ┌───────────────────────────────┐
+│                               │        │                               │
+│  ┌─────────────┐              │        │              ┌─────────────┐  │
+│  │ EBS Volume  │              │        │              │ EBS Volume  │  │
+│  │ Encrypted   │───┐          │        │          ┌───│ Encrypted   │  │
+│  │ With KMS    │   │          │        │          │   │ With KMS    │  │
+│  └─────────────┘   │          │        │          │   └─────────────┘  │
+│                    │          │        │          │                    │
+│         ┌──────────┘          │        │          └──────────┐         │
+│         │                     │        │                     │         │
+│         ▼                     │        │                     ▼         │
+│  ┌─────────────┐  ┌────────┐  │        │  ┌────────┐  ┌─────────────┐  │
+│  │EBS Snapshot │  │KMS Key │  │        │  │KMS Key │  │EBS Snapshot │  │
+│  │ Encrypted   │  │   A    │  │        │  │   B    │  │ Encrypted   │  │
+│  │ With KMS    │  │   🔑   │  │        │  │   🔑   │  │ With KMS    │  │
+│  └──────┬──────┘  └────────┘  │        │  └────────┘  └──────▲──────┘  │
+│         │                     │        │                     │         │
+│         │                     │        │                     │         │
+│         └─────────────────────┼────────┼─────────────────────┘         │
+│                               │        │                               │
+│                          KMS ReEncrypt with KMS Key B                  │
+│                               │        │                               │
+└───────────────────────────────┘        └───────────────────────────────┘
+```
+
+### Process:
+
+```
+1. Snapshot in eu-west-2 encrypted with KMS Key A
+2. Copy snapshot to ap-southeast-2
+3. During copy, AWS:
+   - Decrypts with Key A
+   - Re-encrypts with Key B
+4. New snapshot encrypted with Key B (regional key)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 9: KMS KEY POLICIES
+
+### Concept:
+KMS Key Policies control access to KMS keys, similar to S3 bucket policies.
+
+### Key Difference:
+You CANNOT control access without them - unlike S3 where no policy = 
+anyone with IAM permissions can access.
+
+### 1. DEFAULT KMS KEY POLICY
+
+- Created if you don't provide a specific KMS Key Policy
+- Complete access to the key to the root user = entire AWS account
+- Allows IAM policies to grant access
+
+### 2. CUSTOM KMS KEY POLICY
+
+- Define users, roles that can access the KMS key
+- Define who can administer the key
+- Useful for cross-account access of your KMS key
+
+### Architecture:
+
+```
+KMS KEY POLICY CONTROL:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                              KMS KEY                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                         KEY POLICY                                    │  │
+│  │                                                                       │  │
+│  │   WHO CAN USE THE KEY?                WHO CAN ADMINISTER?             │  │
+│  │   - Users                             - Key administrators            │  │
+│  │   - Roles                             - Can enable/disable            │  │
+│  │   - Cross-account access              - Can modify policy             │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    +                                        │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                        IAM POLICIES                                   │  │
+│  │                                                                       │  │
+│  │   kms:Encrypt, kms:Decrypt, kms:GenerateDataKey, etc.                │  │
+│  │                                                                       │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                    =                                        │
+│                          EFFECTIVE ACCESS                                   │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 10: COPYING SNAPSHOTS ACROSS ACCOUNTS
+
+### Step-by-Step Process:
+
+1. CREATE A SNAPSHOT
+   - Create a Snapshot, encrypted with your own KMS Key
+   - Must be Customer Managed Key (not AWS managed)
+
+2. ATTACH KMS KEY POLICY
+   - Attach a KMS Key Policy to authorize cross-account access
+   - Allow the target account to use your key
+
+3. SHARE THE ENCRYPTED SNAPSHOT
+   - Share the encrypted snapshot with target account
+   - Modify snapshot permissions
+
+4. CREATE COPY IN TARGET ACCOUNT
+   - (In target) Create a copy of the Snapshot
+   - Encrypt it with a CMK in your account
+   - Now you have your own encrypted copy
+
+5. CREATE VOLUME
+   - Create a volume from the snapshot
+   - Use in target account
+
+### KMS Key Policy for Cross-Account:
+
+```json
+{
+  "Sid": "Allow use of the key with destination account",
+  "Effect": "Allow",
+  "Principal": {
+    "AWS": "arn:aws:iam::TARGET-ACCOUNT-ID:role/ROLENAME"
+  },
+  "Action": [
+    "kms:Decrypt",
+    "kms:CreateGrant"
+  ],
+  "Resource": "*",
+  "Condition": {
+    "StringEquals": {
+      "kms:ViaService": "ec2.REGION.amazonaws.com",
+      "kms:CallerAccount": "TARGET-ACCOUNT-ID"
+    }
+  }
+}
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 11 & 12: KMS MULTI-REGION KEYS
+
+### Concept:
+Multi-Region Keys are identical KMS keys in different AWS Regions that 
+can be used interchangeably.
+
+### Architecture:
+
+```
+KMS MULTI-REGION KEYS:
+
+                              AWS KMS
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│      us-east-1                                    us-west-2                 │
+│  ┌───────────────────┐                      ┌───────────────────┐           │
+│  │                   │                      │                   │           │
+│  │  multi-Region     │        sync          │  multi-Region     │           │
+│  │  PRIMARY key      │─────────────────────►│  REPLICA key      │           │
+│  │       🔑          │                      │       🔑          │           │
+│  │                   │                      │                   │           │
+│  │  arn:aws:kms:     │                      │  arn:aws:kms:     │           │
+│  │  us-east-1:       │                      │  us-west-2:       │           │
+│  │  111122223333:    │                      │  111122223333:    │           │
+│  │  key/mrk-1234...  │                      │  key/mrk-1234...  │           │
+│  │                   │                      │                   │           │
+│  └───────────────────┘                      └───────────────────┘           │
+│                                                                             │
+│                              eu-west-1                                      │
+│                        ┌───────────────────┐                                │
+│                        │                   │                                │
+│              sync      │  multi-Region     │                                │
+│            ◄───────────│  REPLICA key      │                                │
+│                        │       🔑          │                                │
+│                        │                   │                                │
+│                        │  arn:aws:kms:     │                                │
+│                        │  eu-west-1:       │                                │
+│                        │  111122223333:    │                                │
+│                        │  key/mrk-1234...  │                                │
+│                        │                   │                                │
+│                        └───────────────────┘                                │
+│                                                                             │
+│   Note: Same key ID (mrk-1234...) in all regions!                          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Key Features:
+
+1. IDENTICAL KEYS IN DIFFERENT REGIONS
+   - Identical KMS keys in different AWS Regions
+   - Can be used interchangeably
+   - Same key ID, same key material
+
+2. SAME KEY PROPERTIES
+   - Multi-Region keys have the same key ID
+   - Same key material
+   - Same automatic rotation settings
+
+3. ENCRYPT IN ONE REGION, DECRYPT IN ANOTHER
+   - Encrypt in one Region
+   - Decrypt in other Regions
+   - No need to re-encrypt
+
+4. NO CROSS-REGION API CALLS
+   - No need to re-encrypt
+   - Or making cross-Region API calls
+   - Low latency
+
+5. NOT GLOBAL
+   - KMS Multi-Region keys are NOT global
+   - Primary + Replicas model
+   - Each Multi-Region key is managed independently
+
+### Use Cases:
+
+```
+USE CASES FOR MULTI-REGION KEYS:
+─────────────────────────────────────────────────────────────────
+- Global client-side encryption
+- Encryption on Global DynamoDB
+- Global Aurora
+- Disaster recovery
+- Multi-region applications
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 13: DYNAMODB GLOBAL TABLES AND KMS MULTI-REGION KEYS
+
+### Concept:
+Use Multi-Region Keys with DynamoDB Global Tables for client-side 
+encryption that works across regions.
+
+### How It Works:
+
+1. ENCRYPT SPECIFIC ATTRIBUTES CLIENT-SIDE
+   - We can encrypt specific attributes client-side
+   - In our DynamoDB table
+   - Using the Amazon DynamoDB Encryption Client
+
+2. REPLICATED WITH GLOBAL TABLES
+   - Combined with Global Tables
+   - The client-side encrypted data is replicated to other regions
+   - Encrypted data travels with replication
+
+3. LOW-LATENCY DECRYPTION
+   - If we use a multi-region key, replicated in the same region
+   - As the DynamoDB Global table
+   - Then clients in these regions can use low-latency API calls to KMS
+
+4. PROTECT SPECIFIC FIELDS
+   - Using client-side encryption we can protect specific fields
+   - And guarantee only decryption if the client has access to an API key
+   - Fine-grained data protection
+
+### Architecture:
+
+```
+DYNAMODB GLOBAL TABLES + KMS MULTI-REGION KEYS:
+
+    us-east-1                                        ap-southeast-2
+                                                     
+                              KMS                                   KMS
+┌──────────────┐         ┌─────────┐           ┌─────────┐    ┌──────────────┐
+│              │ 1.Encrypt│         │           │         │    │              │
+│  Client App  │──────────│  MRK    │           │  MRK    │◄───│  Client App  │
+│              │  with    │ Primary │           │ Replica │ 5. │              │
+└──────┬───────┘ primary  │   🔑    │           │   🔑    │Decrypt          │
+       │         MRK      └─────────┘           └─────────┘    └──────────────┘
+       │                                                              ▲
+       │ 2. Put encrypted                                             │
+       │    attribute                                       4. Get encrypted
+       ▼                                                       attribute
+┌─────────────────────┐                              ┌─────────────────────┐
+│     DDB Table       │                              │     DDB Table       │
+│  ┌───────────────┐  │                              │  ┌───────────────┐  │
+│  │ Attr (SSN)    │  │    3. Global Table           │  │ Attr (SSN)    │  │
+│  │ 🔒 encrypted  │  │─────────────────────────────►│  │ 🔒 encrypted  │  │
+│  └───────────────┘  │       Replication            │  └───────────────┘  │
+└─────────────────────┘                              └─────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 14: GLOBAL AURORA AND KMS MULTI-REGION KEYS
+
+### Concept:
+Similar to DynamoDB, use Multi-Region Keys with Aurora Global Database 
+for client-side encryption that works across regions.
+
+### How It Works:
+
+1. ENCRYPT SPECIFIC ATTRIBUTES CLIENT-SIDE
+   - We can encrypt specific attributes client-side
+   - In our Aurora table
+   - Using the AWS Encryption SDK
+
+2. REPLICATED WITH AURORA GLOBAL TABLES
+   - Combined with Aurora Global Tables
+   - The client-side encrypted data is replicated to other regions
+   - Encrypted columns travel with replication
+
+3. LOW-LATENCY DECRYPTION
+   - If we use a multi-region key, replicated in the same region
+   - As the Global Aurora DB
+   - Then clients can use low-latency API calls to KMS in their region
+
+4. PROTECT FROM DATABASE ADMINS
+   - Using client-side encryption we can protect specific fields
+   - And guarantee only decryption if the client has access to an API key
+   - We can protect specific fields EVEN FROM DATABASE ADMINS
+
+### Key Benefit:
+
+```
+PROTECTION LAYERS:
+─────────────────────────────────────────────────────────────────
+Aurora Native Encryption  →  Protects storage, not from DB admins
+Client-Side Encryption    →  Protects even from DB admins
+                         →  Only API key holders can decrypt
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 15: S3 REPLICATION - ENCRYPTION CONSIDERATIONS
+
+### Default Replication Behavior:
+
+1. UNENCRYPTED OBJECTS
+   - Unencrypted objects are replicated by default
+   - No special configuration needed
+
+2. SSE-S3 ENCRYPTED OBJECTS
+   - Objects encrypted with SSE-S3 are replicated by default
+   - Automatic
+
+3. SSE-C ENCRYPTED OBJECTS
+   - Objects encrypted with SSE-C (customer provided key)
+   - Can be replicated
+   - You provide the key
+
+### SSE-KMS Encrypted Objects:
+
+For objects encrypted with SSE-KMS, you need to enable the option:
+
+1. SPECIFY WHICH KMS KEY
+   - Specify which KMS Key to encrypt the objects within the target bucket
+   - Different key in different region
+
+2. ADAPT THE KMS KEY POLICY
+   - Adapt the KMS Key Policy for the target key
+   - Allow replication to use the key
+
+3. IAM ROLE PERMISSIONS
+   - An IAM Role with:
+     - kms:Decrypt for the source KMS Key
+     - kms:Encrypt for the target KMS Key
+
+4. KMS THROTTLING
+   - You might get KMS throttling errors
+   - In which case you can ask for a Service Quotas increase
+
+### Multi-Region Keys Note:
+
+```
+⚠️ IMPORTANT:
+You can use multi-region AWS KMS Keys, but they are currently 
+treated as independent keys by Amazon S3.
+
+The object will still be decrypted and then encrypted
+(not a direct copy).
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 16: AMI SHARING PROCESS ENCRYPTED VIA KMS
+
+### Step-by-Step Process:
+
+1. AMI IN SOURCE ACCOUNT
+   - AMI in Source Account is encrypted with KMS Key from Source Account
+   - Encrypted EBS snapshot backing the AMI
+
+2. MODIFY LAUNCH PERMISSION
+   - Must modify the image attribute to add a Launch Permission
+   - Which corresponds to the specified target AWS account
+   - Allow target account to launch from this AMI
+
+3. SHARE KMS KEYS
+   - Must share the KMS Keys used to encrypt the snapshot
+   - The AMI references with the target account / IAM Role
+   - Modify KMS key policy
+
+4. TARGET ACCOUNT PERMISSIONS
+   - The IAM Role/User in the target account must have permissions:
+     - DescribeKey
+     - ReEncrypt*
+     - CreateGrant
+     - Decrypt
+
+5. LAUNCH WITH NEW KEY (OPTIONAL)
+   - When launching an EC2 instance from the AMI
+   - Optionally the target account can specify a new KMS key
+   - In its own account to re-encrypt the volumes
+
+### Architecture:
+
+```
+AMI SHARING WITH KMS ENCRYPTION:
+
+     Account - A                              Account - B
+┌────────────────────────────┐          ┌────────────────────────────┐
+│                            │          │                            │
+│  ┌──────────┐   ┌───────┐  │          │  ┌──────────┐   ┌───────┐  │
+│  │          │   │       │  │  share   │  │          │   │       │  │
+│  │   AMI    │   │  KMS  │──┼──────────┼─►│   AMI    │   │  EC2  │  │
+│  │          │   │  Key  │  │          │  │          │   │       │  │
+│  └──────────┘   │   🔑  │  │  share   │  └──────────┘   └───────┘  │
+│                 │       │──┼──────────┼─►                          │
+│                 └───────┘  │          │       launch               │
+│                            │          │          │                 │
+│                            │          │          ▼                 │
+│                            │          │     EC2 Instance           │
+│                            │          │                            │
+└────────────────────────────┘          └────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 17: SSM PARAMETER STORE
+
+### Concept:
+AWS Systems Manager Parameter Store provides secure storage for 
+configuration data and secrets.
+
+### Key Features:
+
+1. SECURE STORAGE
+   - Secure storage for configuration and secrets
+   - Centralized location
+   - Hierarchical organization
+
+2. OPTIONAL ENCRYPTION
+   - Optional Seamless Encryption using KMS
+   - SecureString type
+   - Integrated with KMS
+
+3. SERVERLESS
+   - Serverless, scalable, durable
+   - Easy SDK
+   - No infrastructure to manage
+
+4. VERSION TRACKING
+   - Version tracking of configurations / secrets
+   - Track changes over time
+   - Rollback capability
+
+5. SECURITY THROUGH IAM
+   - Security through IAM
+   - Fine-grained access control
+   - Control who can access which parameters
+
+6. NOTIFICATIONS
+   - Notifications with Amazon EventBridge
+   - React to parameter changes
+   - Automation
+
+7. CLOUDFORMATION INTEGRATION
+   - Integration with CloudFormation
+   - Reference parameters in templates
+   - Dynamic configuration
+
+### Architecture:
+
+```
+SSM PARAMETER STORE:
+
+                                           ┌─────────────────┐
+                                           │  Applications   │
+                                           └────────┬────────┘
+                                                    │
+                                                    │
+┌─────────────────┐   Plaintext        ┌───────────┴─────────────┐
+│                 │   configuration    │                         │
+│   Plaintext     │───────────────────►│   SSM Parameter Store   │
+│   Config        │                    │                         │
+│                 │                    │  Check IAM              │
+└─────────────────┘                    │  permissions            │
+                                       │       ┌─────────────┐   │
+┌─────────────────┐   Encrypted        │       │  ✓ ✗        │   │
+│                 │   configuration    │       └─────────────┘   │
+│   Encrypted     │───────────────────►│                         │
+│   Config        │                    └───────────┬─────────────┘
+│                 │                                │
+└─────────────────┘                                │ Decryption
+                                                   │ Service
+                                                   ▼
+                                           ┌─────────────────┐
+                                           │    AWS KMS      │
+                                           │       🔑        │
+                                           └─────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 18: SSM PARAMETER STORE HIERARCHY
+
+### Concept:
+Parameter Store supports hierarchical organization using paths, 
+making it easy to organize and retrieve parameters.
+
+### Example Hierarchy:
+
+```
+/my-department/
+    └── my-app/
+            ├── dev/
+            │     ├── db-url
+            │     └── db-password
+            └── prod/
+                  ├── db-url
+                  └── db-password
+                  
+/other-department/
+    └── ...
+
+/aws/reference/secretsmanager/secret_ID_in_Secrets_Manager
+
+/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2 (public)
+```
+
+### API Access:
+
+```
+ACCESSING PARAMETERS BY PATH:
+
+┌───────────────────────────────────────────────────────────────────┐
+│                                                                   │
+│   GetParameters or                                                │
+│   GetParametersByPath API                                         │
+│                                                                   │
+│   /my-department/my-app/dev/ ─────────────────►  Dev Lambda       │
+│                                                  Function         │
+│                                                                   │
+│   /my-department/my-app/prod/ ────────────────►  Prod Lambda      │
+│                                                  Function         │
+│                                                                   │
+└───────────────────────────────────────────────────────────────────┘
+```
+
+### Public Parameters:
+
+AWS provides public parameters:
+- Latest AMI IDs
+- AWS service endpoints
+- And more
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 19: STANDARD AND ADVANCED PARAMETER TIERS
+
+### Comparison:
+
+```
+FEATURE                          STANDARD              ADVANCED
+─────────────────────────────────────────────────────────────────────────
+Total number of parameters       10,000                100,000
+(per AWS account and Region)
+
+Maximum size of a                4 KB                  8 KB
+parameter value
+
+Parameter policies available     No                    Yes
+
+Cost                             No additional         Charges apply
+                                 charge                
+
+Storage Pricing                  Free                  $0.05 per advanced
+                                                       parameter per month
+```
+
+### When to Use Advanced:
+
+```
+USE STANDARD:                       USE ADVANCED:
+─────────────────────────────────────────────────────────────────
+- Up to 10,000 parameters           - Need more than 10,000
+- Values up to 4KB                  - Values larger than 4KB
+- No TTL needed                     - Need parameter policies
+- Cost-sensitive                    - Need TTL/expiration
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 20: PARAMETERS POLICIES (FOR ADVANCED PARAMETERS)
+
+### Concept:
+Parameter policies allow you to assign a TTL to a parameter (expiration 
+date) to force updating or deleting sensitive data such as passwords.
+
+### Key Features:
+
+- Allow to assign a TTL to a parameter (expiration date)
+- Force updating or deleting sensitive data such as passwords
+- Can assign multiple policies at a time
+
+### Policy Types:
+
+### 1. EXPIRATION POLICY (Delete a parameter)
+
+```json
+{
+  "Type": "Expiration",
+  "Version": "1.0",
+  "Attributes": {
+    "Timestamp": "2020-12-02T21:34:33.000Z"
+  }
+}
+```
+
+**Purpose:** Auto-delete the parameter at the specified time
+
+### 2. EXPIRATION NOTIFICATION (EventBridge)
+
+```json
+{
+  "Type": "ExpirationNotification",
+  "Version": "1.0",
+  "Attributes": {
+    "Before": "15",
+    "Unit": "Days"
+  }
+}
+```
+
+**Purpose:** Notify 15 days before expiration via EventBridge
+
+### 3. NO CHANGE NOTIFICATION (EventBridge)
+
+```json
+{
+  "Type": "NoChangeNotification",
+  "Version": "1.0",
+  "Attributes": {
+    "After": "20",
+    "Unit": "Days"
+  }
+}
+```
+
+**Purpose:** Notify if parameter hasn't been changed in 20 days
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 21: AWS SECRETS MANAGER
+
+### Concept:
+AWS Secrets Manager is a newer service specifically designed for storing 
+and rotating secrets, especially for RDS integration.
+
+### Key Features:
+
+1. MEANT FOR STORING SECRETS
+   - Newer service, meant for storing secrets
+   - Purpose-built for secret management
+   - More features than Parameter Store
+
+2. FORCE ROTATION OF SECRETS
+   - Capability to force rotation of secrets every X days
+   - Automatic rotation
+   - Configurable schedule
+
+3. AUTOMATE GENERATION
+   - Automate generation of secrets on rotation
+   - Uses Lambda functions
+   - No manual intervention
+
+4. INTEGRATION WITH AMAZON RDS
+   - Integration with Amazon RDS
+   - MySQL, PostgreSQL, Aurora
+   - Automatic password rotation
+
+5. ENCRYPTED USING KMS
+   - Secrets are encrypted using KMS
+   - Secure storage
+   - Customer managed keys supported
+
+6. MAINLY FOR RDS INTEGRATION
+   - Mostly meant for RDS integration
+   - Database credentials
+   - But can store any secret
+
+### Secrets Manager vs Parameter Store:
+
+```
+FEATURE                    PARAMETER STORE        SECRETS MANAGER
+─────────────────────────────────────────────────────────────────────────
+Purpose                    Configuration          Secrets
+Auto Rotation              No                     Yes (built-in)
+RDS Integration           Manual                  Native
+Pricing                   Free tier available     $0.40/secret/month
+Lambda for Rotation       DIY                     Built-in
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 22: AWS SECRETS MANAGER – MULTI-REGION SECRETS
+
+### Concept:
+Secrets Manager can replicate secrets across multiple AWS Regions 
+for disaster recovery and multi-region applications.
+
+### Key Features:
+
+1. REPLICATE SECRETS
+   - Replicate Secrets across multiple AWS Regions
+   - Automatic synchronization
+   - Consistent secrets globally
+
+2. KEEP READ REPLICAS IN SYNC
+   - Secrets Manager keeps read replicas in sync with the primary Secret
+   - Changes propagate automatically
+   - Eventually consistent
+
+3. PROMOTE TO STANDALONE
+   - Ability to promote a read replica Secret to a standalone Secret
+   - For disaster recovery
+   - Regional independence
+
+### Use Cases:
+
+- Multi-region apps
+- Disaster recovery strategies
+- Multi-region DB connections
+
+### Architecture:
+
+```
+MULTI-REGION SECRETS:
+
+    us-east-1 (Primary)                      us-west-2 (Secondary)
+┌────────────────────────────────┐      ┌────────────────────────────────┐
+│                                │      │                                │
+│   ┌──────────────────────┐     │      │     ┌──────────────────────┐   │
+│   │   Secrets Manager    │     │      │     │   Secrets Manager    │   │
+│   │                      │     │      │     │                      │   │
+│   │   ┌──────────────┐   │     │      │     │   ┌──────────────┐   │   │
+│   │   │ MySecret-A   │   │     │      │     │   │ MySecret-A   │   │   │
+│   │   │  (primary)   │───┼─────┼──────┼─────┼──►│  (replica)   │   │   │
+│   │   │    🔒        │   │     │replicate   │   │    🔒        │   │   │
+│   │   └──────────────┘   │     │      │     │   └──────────────┘   │   │
+│   │                      │     │      │     │                      │   │
+│   └──────────────────────┘     │      │     └──────────────────────┘   │
+│                                │      │                                │
+└────────────────────────────────┘      └────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                              END OF PART 1
+═══════════════════════════════════════════════════════════════════════════════
+
+Continue to Part 2 for:
+- AWS Certificate Manager (ACM)
+- API Gateway Endpoint Types
+- AWS WAF (Web Application Firewall)
+- AWS Shield (DDoS Protection)
+- AWS Firewall Manager
+- DDoS Best Practices
+- Amazon GuardDuty
+- Amazon Inspector
+- AWS Macie
+
+═══════════════════════════════════════════════════════════════════════════════
+# AWS SECURITY & ENCRYPTION - COMPLETE GUIDE (PART 2)
+## ACM, WAF, Shield, Firewall Manager, GuardDuty, Inspector, Macie
+
+═══════════════════════════════════════════════════════════════════════════════
+                              TABLE OF CONTENTS - PART 2
+═══════════════════════════════════════════════════════════════════════════════
+
+23. AWS Certificate Manager (ACM)
+24. ACM – Requesting Public Certificates
+25. ACM – Importing Public Certificates
+26. ACM – Integration with ALB
+27. API Gateway - Endpoint Types
+28. ACM – Integration with API Gateway
+29. AWS WAF – Web Application Firewall (Introduction)
+30. AWS WAF – Web ACL Rules
+31. WAF – Fixed IP with Load Balancer
+32. AWS Shield: DDoS Protection
+33. AWS Firewall Manager
+34. WAF vs. Firewall Manager vs. Shield
+35. DDoS Best Practices - Edge Location Mitigation
+36. DDoS Best Practices - DDoS Mitigation
+37. DDoS Best Practices - Application Layer Defense
+38. DDoS Best Practices - Attack Surface Reduction
+39. Amazon GuardDuty (Introduction)
+40. Amazon GuardDuty (Architecture)
+41. Amazon Inspector
+42. What does Amazon Inspector evaluate?
+43. AWS Macie
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 23: AWS CERTIFICATE MANAGER (ACM)
+
+### Concept:
+AWS Certificate Manager (ACM) lets you easily provision, manage, and deploy 
+TLS Certificates for in-flight encryption.
+
+### Key Features:
+
+1. PROVISION AND MANAGE TLS CERTIFICATES
+   - Easily provision, manage, and deploy TLS Certificates
+   - Simplified certificate lifecycle
+   - Centralized management
+
+2. IN-FLIGHT ENCRYPTION
+   - Provide in-flight encryption for websites (HTTPS)
+   - Secure web traffic
+   - Browser trust
+
+3. PUBLIC AND PRIVATE CERTIFICATES
+   - Supports both public and private TLS certificates
+   - Public for internet-facing
+   - Private for internal use
+
+4. FREE FOR PUBLIC CERTIFICATES
+   - Free of charge for public TLS certificates
+   - No cost for certificates
+   - Only pay for resources
+
+5. AUTOMATIC RENEWAL
+   - Automatic TLS certificate renewal
+   - 60 days before expiry
+   - No manual intervention
+
+6. INTEGRATIONS
+   - Load TLS certificates on:
+     - Elastic Load Balancers (CLB, ALB, NLB)
+     - CloudFront Distributions
+     - APIs on API Gateway
+
+7. CANNOT USE WITH EC2
+   - Cannot use ACM with EC2
+   - Certificate can't be extracted
+   - EC2 needs manual certificate management
+
+### Architecture:
+
+```
+ACM INTEGRATION:
+
+                           ┌─────────────────────────────────────┐
+         HTTPS             │        Application Load             │
+    ┌──────────────────────│           Balancer                  │
+    │                      │   with HTTP -> HTTPS redirect       │
+    │                      └───────────────┬─────────────────────┘
+    │                                      │
+    │      ┌───────────────────────────────┤
+    │      │                               │
+    ▼      ▼                               ▼
+┌──────────────────┐              ┌─────────────────────┐
+│                  │  provision   │   Auto Scaling      │
+│       AWS        │  and         │      Group          │
+│   Certificate    │  maintain    │  ┌───────┐ ┌───────┐│
+│     Manager      │  TLS certs   │  │  EC2  │ │  EC2  ││
+│                  │──────────────│  └───────┘ └───────┘│
+└──────────────────┘              │                     │
+                                  └─────────────────────┘
+                                          HTTP
+                              (internal traffic unencrypted)
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 24: ACM – REQUESTING PUBLIC CERTIFICATES
+
+### Process:
+
+### Step 1: List Domain Names
+- Fully Qualified Domain Name (FQDN): corp.example.com
+- Wildcard Domain: *.example.com
+- Can include multiple domains
+
+### Step 2: Select Validation Method
+
+**DNS Validation (Preferred):**
+- DNS Validation is preferred for automation purposes
+- Leverage a CNAME record to DNS config (ex: Route 53)
+- Automatic renewal possible
+
+**Email Validation:**
+- Email validation will send emails to contact addresses
+- In the WHOIS database
+- Manual approval required
+
+### Step 3: Wait for Verification
+- It will take a few hours to get verified
+- DNS propagation time
+- Certificate in "Pending validation" state
+
+### Step 4: Automatic Renewal
+- The Public Certificate will be enrolled for automatic renewal
+- ACM automatically renews ACM-generated certificates 60 days before expiry
+- No action needed
+
+### Validation Comparison:
+
+```
+VALIDATION METHOD        AUTOMATION        RENEWAL              BEST FOR
+─────────────────────────────────────────────────────────────────────────────
+DNS Validation       →   High           →  Automatic        →  Production
+Email Validation     →   Low            →  Manual/Auto      →  Quick setup
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 25: ACM – IMPORTING PUBLIC CERTIFICATES
+
+### Concept:
+You can generate certificates outside of ACM and import them.
+
+### Key Points:
+
+1. NO AUTOMATIC RENEWAL
+   - No automatic renewal for imported certificates
+   - Must import a new certificate before expiry
+   - Manual process
+
+2. EXPIRATION EVENTS
+   - ACM sends daily expiration events
+   - Starting 45 days prior to expiration
+   - The # of days can be configured
+
+3. EVENTBRIDGE INTEGRATION
+   - Events are appearing in EventBridge
+   - Can trigger Lambda, SNS, SQS
+   - Automated alerting
+
+4. AWS CONFIG RULE
+   - AWS Config has a managed rule named acm-certificate-expiration-check
+   - To check for expiring certificates
+   - Configurable number of days
+
+### Architecture:
+
+```
+IMPORTED CERTIFICATE MONITORING:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   ┌─────────────┐                                                           │
+│   │     ACM     │                                                           │
+│   │  (imported  │─────────────────────────────────────────┐                 │
+│   │ certificate)│    ACM Events:                          │                 │
+│   └──────┬──────┘    Daily Certificate Expiry             │                 │
+│          │                                                ▼                 │
+│          │                                        ┌───────────────┐         │
+│          │                                        │               │         │
+│          │                                        │  EventBridge  │─────┐   │
+│          │                                        │               │     │   │
+│          │                                        └───────┬───────┘     │   │
+│   ┌──────┴──────┐                                         │             │   │
+│   │  AWS Config │        Rule events:                     │             │   │
+│   │             │────────────────────────────────────────►│             │   │
+│   │ Rule check  │        Non-compliance                   │             │   │
+│   └─────────────┘                                         │             │   │
+│                                                           ▼             ▼   │
+│                                                     ┌─────────┐   ┌───────┐ │
+│                                                     │ Lambda  │   │  SNS  │ │
+│                                                     └─────────┘   └───────┘ │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 26: ACM – INTEGRATION WITH ALB
+
+### Architecture:
+
+```
+ACM + ALB INTEGRATION:
+
+                    Application Load Balancer
+                    With HTTP -> HTTPS redirect rule
+                    
+                              ┌───────────────────┐
+                              │                   │
+           HTTP               │        ALB        │              HTTP
+    ──────────────────────────│                   │──────────────────────────►
+                              │                   │
+    ◄─────────────────────────│                   │
+       Redirect to HTTPS      │                   │           ┌─────────────────┐
+                              └─────────┬─────────┘           │ Auto Scaling    │
+           HTTPS                        │                     │    Group        │
+    ──────────────────────────────────►│                     │  ┌─────┐ ┌─────┐│
+                                       │                     │  │ EC2 │ │ EC2 ││
+                                       └────────────────────►│  └─────┘ └─────┘│
+                            provision and                    └─────────────────┘
+                            maintain TLS certs
+                                       │
+                              ┌────────┴────────┐
+                              │      AWS        │
+                              │   Certificate   │
+                              │    Manager      │
+                              └─────────────────┘
+```
+
+### How It Works:
+
+1. Client sends HTTP request
+2. ALB redirects to HTTPS
+3. Client sends HTTPS request
+4. ALB uses ACM certificate for TLS
+5. ALB forwards to EC2 over HTTP (internal)
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 27: API GATEWAY - ENDPOINT TYPES
+
+### Three Types of Endpoints:
+
+### 1. EDGE-OPTIMIZED (Default)
+- For global clients
+- Requests are routed through CloudFront Edge locations (improves latency)
+- The API Gateway still lives in only one region
+
+### 2. REGIONAL
+- For clients within the same region
+- Could manually combine with CloudFront
+- More control over the caching strategies and the distribution
+
+### 3. PRIVATE
+- Can only be accessed from your VPC using an interface VPC endpoint (ENI)
+- Use a resource policy to define access
+- Internal APIs only
+
+### Comparison:
+
+```
+ENDPOINT TYPE        SCOPE              USE CASE
+─────────────────────────────────────────────────────────────────────────
+Edge-Optimized   →   Global         →   Public APIs, worldwide users
+Regional         →   Same region    →   Regional apps, CloudFront control
+Private          →   VPC only       →   Internal APIs, microservices
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 28: ACM – INTEGRATION WITH API GATEWAY
+
+### Concept:
+Create a Custom Domain Name in API Gateway and link it to ACM certificates.
+
+### Edge-Optimized (Default):
+
+- For global clients
+- Requests are routed through CloudFront Edge locations (improves latency)
+- The API Gateway still lives in only one region
+- **TLS Certificate must be in the same region as CloudFront, in us-east-1**
+- Then setup CNAME or (better) A-Alias record in Route 53
+
+### Regional:
+
+- For clients within the same region
+- **TLS Certificate must be imported on API Gateway, in the same region as the API Stage**
+- Then setup CNAME or (better) A-Alias record in Route 53
+
+### Architecture:
+
+```
+ACM + API GATEWAY:
+
+    EDGE-OPTIMIZED                           REGIONAL
+    
+    us-east-1                                ap-southeast-2
+┌──────────────────────┐                 ┌──────────────────────┐
+│                      │                 │                      │
+│    ┌───────────┐     │                 │    ┌───────────┐     │
+│    │CloudFront │     │                 │    │API Gateway│     │
+│    │           │     │                 │    │ Regional  │     │
+│    └─────┬─────┘     │                 │    └─────┬─────┘     │
+│          │           │                 │          │           │
+│   linked │           │                 │   linked │           │
+│   cert   │           │                 │   cert   │           │
+│          ▼           │                 │          ▼           │
+│    ┌───────────┐     │                 │    ┌───────────┐     │
+│    │    ACM    │     │                 │    │    ACM    │     │
+│    └───────────┘     │                 │    └───────────┘     │
+│                      │                 │                      │
+│    ┌───────────┐     │                 └──────────────────────┘
+│    │API Gateway│     │
+│    │Edge-Optim │     │
+│    └───────────┘     │
+│                      │
+└──────────────────────┘
+
+⚠️ Edge-Optimized: ACM must be in us-east-1
+⚠️ Regional: ACM must be in same region as API
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 29 & 30: AWS WAF – WEB APPLICATION FIREWALL
+
+### Concept:
+AWS WAF protects your web applications from common web exploits at Layer 7 (HTTP).
+
+### Key Points:
+
+1. LAYER 7 IS HTTP
+   - Layer 7 is HTTP (vs Layer 4 is TCP/UDP)
+   - Application layer
+   - Can inspect HTTP content
+
+2. DEPLOY ON
+   - Application Load Balancer
+   - API Gateway
+   - CloudFront
+   - AppSync GraphQL API
+   - Cognito User Pool
+
+### Web ACL (Web Access Control List) Rules:
+
+1. IP SET
+   - Up to 10,000 IP addresses
+   - Use multiple Rules for more IPs
+   - Allow/block specific IPs
+
+2. HTTP INSPECTION
+   - HTTP headers, HTTP body, or URI strings
+   - Protects from common attack:
+     - SQL injection
+     - Cross-Site Scripting (XSS)
+
+3. SIZE CONSTRAINTS
+   - Limit request sizes
+   - Prevent oversized payloads
+
+4. GEO-MATCH
+   - Block specific countries
+   - Geographic restrictions
+
+5. RATE-BASED RULES
+   - To count occurrences of events
+   - For DDoS protection
+   - Limit requests per IP
+
+### Important Notes:
+
+- Web ACL are Regional except for CloudFront
+- A rule group is a reusable set of rules that you can add to a web ACL
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 31: WAF – FIXED IP WITH LOAD BALANCER
+
+### Problem:
+WAF does not support the Network Load Balancer (Layer 4)
+
+### Solution:
+Use Global Accelerator for fixed IP and WAF on the ALB
+
+### Architecture:
+
+```
+WAF + FIXED IP SOLUTION:
+
+                                        us-east-1
+┌─────────┐                    ┌─────────────────────────────────────────────┐
+│         │                    │                                             │
+│  Users  │                    │   ┌───────────────────────────────────┐     │
+│         │                    │   │    Application Load Balancer      │     │
+└────┬────┘                    │   │                                   │     │
+     │                         │   └───────────────┬───────────────────┘     │
+     │                         │                   │                         │
+     ▼                         │                   │ attached                │
+┌──────────────────┐           │                   ▼                         │
+│                  │           │           ┌───────────────┐                 │
+│ Global           │           │           │    AWS WAF    │                 │
+│ Accelerator      │───────────┼──────────►│    WebACL     │                 │
+│                  │           │           │               │                 │
+│ Fixed IPv4:      │           │           │ WebACL must   │                 │
+│ 1.2.3.4          │           │           │ be in same    │     ┌─────────┐ │
+│                  │           │           │ region as ALB │────►│  EC2    │ │
+└──────────────────┘           │           └───────────────┘     │Instances│ │
+                               │                                 └─────────┘ │
+                               └─────────────────────────────────────────────┘
+```
+
+### Key Points:
+
+- Global Accelerator provides fixed IP addresses
+- Traffic flows through Global Accelerator to ALB
+- WAF protects at ALB level
+- Best of both worlds: fixed IP + WAF protection
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 32: AWS SHIELD - DDOS PROTECTION
+
+### What is DDoS?
+DDoS: Distributed Denial of Service – many requests at the same time
+
+### AWS Shield Standard:
+
+- FREE service that is activated for every AWS customer
+- Provides protection from attacks such as:
+  - SYN/UDP Floods
+  - Reflection attacks
+  - Other layer 3/layer 4 attacks
+
+### AWS Shield Advanced:
+
+- Optional DDoS mitigation service ($3,000 per month per organization)
+- Protect against more sophisticated attacks on:
+  - Amazon EC2
+  - Elastic Load Balancing (ELB)
+  - Amazon CloudFront
+  - AWS Global Accelerator
+  - Route 53
+- 24/7 access to AWS DDoS response team (DRP)
+- Protect against higher fees during usage spikes due to DDoS
+- Shield Advanced automatic application layer DDoS mitigation:
+  - Automatically creates, evaluates and deploys AWS WAF rules to mitigate layer 7 attacks
+
+### Comparison:
+
+```
+FEATURE                    SHIELD STANDARD         SHIELD ADVANCED
+─────────────────────────────────────────────────────────────────────────
+Cost                   →   Free                →   $3,000/month
+Layer 3/4 Protection   →   Yes                 →   Yes (enhanced)
+Layer 7 Protection     →   No                  →   Yes (auto WAF rules)
+DRP Access            →   No                  →   24/7
+Cost Protection       →   No                  →   Yes
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 33: AWS FIREWALL MANAGER
+
+### Concept:
+AWS Firewall Manager allows you to manage security rules across all 
+accounts in an AWS Organization.
+
+### Key Features:
+
+1. MANAGE RULES IN ALL ACCOUNTS
+   - Manage rules in all accounts of an AWS Organization
+   - Centralized security management
+   - Consistent policies
+
+2. SECURITY POLICY
+   - Common set of security rules:
+     - WAF rules (Application Load Balancer, API Gateways, CloudFront)
+     - AWS Shield Advanced (ALB, CLB, NLB, Elastic IP, CloudFront)
+     - Security Groups for EC2, ALB and ENI resources in VPC
+     - AWS Network Firewall (VPC Level)
+     - Amazon Route 53 Resolver DNS Firewall
+
+3. POLICIES AT REGION LEVEL
+   - Policies are created at the region level
+   - Apply across accounts
+
+4. AUTO-APPLY TO NEW RESOURCES
+   - Rules are applied to new resources as they are created
+   - Good for compliance
+   - Across all and future accounts in your Organization
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 34: WAF VS. FIREWALL MANAGER VS. SHIELD
+
+### How They Work Together:
+
+WAF, Shield and Firewall Manager are used together for comprehensive protection
+
+### Decision Guide:
+
+1. DEFINE WEB ACL RULES IN WAF
+   - Start with WAF for your web ACL rules
+   - Granular protection of your resources
+   - WAF alone is the correct choice for single-account/resource protection
+
+2. USE FIREWALL MANAGER FOR SCALE
+   - If you want to use AWS WAF across accounts
+   - Accelerate WAF configuration
+   - Automate the protection of new resources
+   - Use Firewall Manager with AWS WAF
+
+3. ADD SHIELD ADVANCED FOR DDoS
+   - Shield Advanced adds additional features on top of AWS WAF
+   - Dedicated support from the Shield Response Team (SRT)
+   - Advanced reporting
+   - If you're prone to frequent DDoS attacks, consider purchasing Shield Advanced
+
+### Summary:
+
+```
+SERVICE              SCOPE                USE CASE
+─────────────────────────────────────────────────────────────────────────
+WAF             →   Single resource   →  Granular Layer 7 protection
+Firewall Mgr    →   Organization      →  Centralized policy management
+Shield Std      →   All customers     →  Basic DDoS protection (free)
+Shield Adv      →   Enhanced          →  Advanced DDoS + DRT support
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 35-38: AWS BEST PRACTICES FOR DDOS RESILIENCY
+
+### BP1 – CloudFront (Edge Location Mitigation)
+- Web Application delivery at the edge
+- Protect from DDoS Common Attacks (SYN floods, UDP reflection...)
+- Static content caching at edge
+
+### BP1 – Global Accelerator (Edge Location Mitigation)
+- Access your application from the edge
+- Integration with Shield for DDoS protection
+- Helpful if your backend is not compatible with CloudFront
+
+### BP3 – Route 53 (Edge Location Mitigation)
+- Domain Name Resolution at the edge
+- DDoS Protection mechanism
+- Highly available DNS
+
+### Infrastructure Layer Defense (BP1, BP3, BP6)
+- Protect Amazon EC2 against high traffic
+- Using Global Accelerator, Route 53, CloudFront, Elastic Load Balancing
+- Distribute and absorb attack traffic
+
+### Amazon EC2 with Auto Scaling (BP7)
+- Helps scale in case of sudden traffic surges
+- Including a flash crowd or a DDoS attack
+- Maintain availability during attacks
+
+### Elastic Load Balancing (BP6)
+- Elastic Load Balancing scales with the traffic increases
+- Will distribute the traffic to many EC2 instances
+- Prevents single point of failure
+
+### Application Layer Defense (BP1, BP2)
+
+**Detect and filter malicious web requests:**
+- CloudFront cache static content and serve it from edge locations
+- Protecting your backend
+- AWS WAF is used on top of CloudFront and ALB
+- Filter and block requests based on request signatures
+- WAF rate-based rules can automatically block the IPs of bad actors
+- Use managed rules on WAF to block attacks based on IP reputation
+- Or block anonymous IPs
+- CloudFront can block specific geographies
+
+### Shield Advanced (BP1, BP2, BP6)
+- Shield Advanced automatic application layer DDoS mitigation
+- Automatically creates, evaluates and deploys AWS WAF rules
+- To mitigate layer 7 attacks
+
+### Attack Surface Reduction
+
+**Obfuscating AWS resources (BP1, BP4, BP6):**
+- Using CloudFront, API Gateway, Elastic Load Balancing
+- To hide your backend resources (Lambda functions, EC2 instances)
+- Attackers can't directly target your resources
+
+**Security groups and Network ACLs (BP5):**
+- Use security groups and NACLs
+- Filter traffic based on specific IP at the subnet or ENI-level
+- Elastic IP are protected by AWS Shield Advanced
+
+**Protecting API endpoints (BP4):**
+- Hide EC2, Lambda, elsewhere
+- Edge-optimized mode, or CloudFront + regional mode
+- WAF + API Gateway: burst limits, headers filtering, use API keys
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 39 & 40: AMAZON GUARDDUTY
+
+### Concept:
+Amazon GuardDuty provides intelligent threat discovery to protect your 
+AWS Account using Machine Learning.
+
+### Key Features:
+
+1. INTELLIGENT THREAT DISCOVERY
+   - Intelligent Threat discovery to protect your AWS Account
+   - Detects suspicious activity
+   - Identifies potential security issues
+
+2. MACHINE LEARNING
+   - Uses Machine Learning algorithms
+   - Anomaly detection
+   - 3rd party data (threat intelligence)
+
+3. ONE CLICK TO ENABLE
+   - One click to enable (30 days trial)
+   - No need to install software
+   - No agents required
+
+### Input Data Sources:
+
+1. CLOUDTRAIL EVENTS LOGS
+   - Unusual API calls, unauthorized deployments
+   - CloudTrail Management Events: create VPC subnet, create trail...
+   - CloudTrail S3 Data Events: get object, list objects, delete object...
+
+2. VPC FLOW LOGS
+   - Unusual internal traffic
+   - Unusual IP address
+   - Network anomalies
+
+3. DNS LOGS
+   - Compromised EC2 instances
+   - Sending encoded data within DNS queries
+   - Data exfiltration detection
+
+4. OPTIONAL FEATURES
+   - EKS Audit Logs
+   - RDS & Aurora Login Activity
+   - EBS Volumes
+   - Lambda Network Activity
+   - S3 Data Events
+
+### EventBridge Integration:
+
+- Can setup EventBridge rules to be notified in case of findings
+- EventBridge rules can target AWS Lambda or SNS
+- Automated response to threats
+
+### CryptoCurrency Protection:
+- Can protect against CryptoCurrency attacks
+- Has a dedicated "finding" for it
+- Detect cryptomining activity
+
+### Architecture:
+
+```
+GUARDDUTY ARCHITECTURE:
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                                                                             │
+│   ┌────────────────┐                                                        │
+│   │ VPC Flow Logs  │───────────────┐                                        │
+│   └────────────────┘               │                                        │
+│                                    │                                        │
+│   ┌────────────────┐               │         ┌───────────────┐              │
+│   │ CloudTrail     │───────────────┼────────►│               │              │
+│   │ Logs           │               │         │   GuardDuty   │              │
+│   └────────────────┘               │         │               │              │
+│                                    │         └───────┬───────┘              │
+│   ┌────────────────┐               │                 │                      │
+│   │ DNS Logs       │───────────────┘                 │                      │
+│   │ (AWS DNS)      │                                 ▼                      │
+│   └────────────────┘                         ┌───────────────┐              │
+│                                              │               │              │
+│   ┌────────────────────────────────┐         │  EventBridge  │──────┐       │
+│   │      Optional Features         │         │               │      │       │
+│   │                                │         └───────────────┘      │       │
+│   │  ┌──────────┐  ┌──────────┐    │                                ▼       │
+│   │  │ S3 Logs  │  │EBS Vols  │    │────────►              ┌───────────────┐│
+│   │  └──────────┘  └──────────┘    │                       │     SNS       ││
+│   │  ┌──────────┐  ┌──────────┐    │                       └───────────────┘│
+│   │  │ Lambda   │  │RDS/Aurora│    │                                        │
+│   │  │ Network  │  │ Login    │    │                       ┌───────────────┐│
+│   │  └──────────┘  └──────────┘    │                       │    Lambda     ││
+│   │  ┌──────────┐                  │                       └───────────────┘│
+│   │  │EKS Audit │                  │                                        │
+│   │  │ Logs     │                  │                                        │
+│   │  └──────────┘                  │                                        │
+│   └────────────────────────────────┘                                        │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 41 & 42: AMAZON INSPECTOR
+
+### Concept:
+Amazon Inspector provides automated security assessments for EC2 instances, 
+Container Images, and Lambda functions.
+
+### What It Assesses:
+
+1. FOR EC2 INSTANCES
+   - Leveraging the AWS System Manager (SSM) agent
+   - Analyze against unintended network accessibility
+   - Analyze the running OS against known vulnerabilities
+
+2. FOR CONTAINER IMAGES PUSHED TO AMAZON ECR
+   - Assessment of Container Images as they are pushed
+   - Vulnerability scanning
+   - Before deployment
+
+3. FOR LAMBDA FUNCTIONS
+   - Identifies software vulnerabilities in function code
+   - And package dependencies
+   - Assessment of functions as they are deployed
+
+### Key Features:
+
+1. CONTINUOUS SCANNING
+   - Continuous scanning of the infrastructure
+   - Only when needed
+   - Event-driven assessments
+
+2. PACKAGE VULNERABILITIES
+   - Package vulnerabilities (EC2, ECR & Lambda)
+   - Database of CVE (Common Vulnerabilities and Exposures)
+   - Up-to-date vulnerability database
+
+3. NETWORK REACHABILITY
+   - Network reachability (EC2)
+   - Identifies unintended network exposure
+   - Security group analysis
+
+4. RISK SCORE
+   - A risk score is associated with all vulnerabilities
+   - For prioritization
+   - Focus on critical issues first
+
+### Reporting:
+
+- Reporting & integration with AWS Security Hub
+- Send findings to Amazon EventBridge
+- Automated response possible
+
+### Architecture:
+
+```
+AMAZON INSPECTOR:
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   ┌────────────────┐      ┌────────────────┐      ┌────────────────┐      │
+│   │Lambda Function │      │  EC2 Instance  │      │ ECR Container  │      │
+│   │                │      │  + SSM Agent   │      │     Image      │      │
+│   └───────┬────────┘      └───────┬────────┘      └───────┬────────┘      │
+│           │                       │                       │               │
+│           └───────────────────────┼───────────────────────┘               │
+│                                   │                                       │
+│                                   ▼                                       │
+│                          ┌────────────────┐                               │
+│                          │    Amazon      │                               │
+│                          │   Inspector    │                               │
+│                          └───────┬────────┘                               │
+│                                  │                                        │
+│                    assessment run state                                   │
+│                        & findings                                         │
+│                                  │                                        │
+│                    ┌─────────────┴─────────────┐                          │
+│                    │                           │                          │
+│                    ▼                           ▼                          │
+│           ┌────────────────┐          ┌────────────────┐                  │
+│           │  Security Hub  │          │  EventBridge   │                  │
+│           └────────────────┘          └────────────────┘                  │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+
+## SLIDE 43: AWS MACIE
+
+### Concept:
+Amazon Macie is a fully managed data security and data privacy service 
+that uses machine learning to discover and protect sensitive data in AWS.
+
+### Key Features:
+
+1. DATA SECURITY AND PRIVACY SERVICE
+   - Fully managed data security and data privacy service
+   - Machine learning and pattern matching
+   - Discover and protect your sensitive data in AWS
+
+2. IDENTIFY SENSITIVE DATA
+   - Macie helps identify and alert you to sensitive data
+   - Such as personally identifiable information (PII)
+   - Credit cards, SSN, etc.
+
+### Architecture:
+
+```
+AWS MACIE:
+
+┌───────────────────────────────────────────────────────────────────────────┐
+│                                                                           │
+│   ┌────────────────┐     analyze     ┌────────────────┐                   │
+│   │                │─────────────────│                │                   │
+│   │   S3 Buckets   │                 │     Macie      │                   │
+│   │                │                 │   Discover     │                   │
+│   │   [data]       │                 │ Sensitive Data │                   │
+│   │   [data]       │                 │     (PII)      │                   │
+│   │   [data]       │                 │                │                   │
+│   └────────────────┘                 └───────┬────────┘                   │
+│                                              │                            │
+│                                      notify  │                            │
+│                                              ▼                            │
+│                                      ┌────────────────┐                   │
+│                                      │                │                   │
+│                                      │  EventBridge   │────► integrations │
+│                                      │                │                   │
+│                                      └────────────────┘                   │
+│                                                                           │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+### What Macie Discovers:
+
+```
+SENSITIVE DATA TYPES:
+─────────────────────────────────────────────────────────────────
+Personal Information:
+- Names, addresses, phone numbers
+- Social Security Numbers (SSN)
+- Passport numbers, driver's license
+
+Financial Information:
+- Credit card numbers
+- Bank account numbers
+- Financial documents
+
+Healthcare Information:
+- Health records
+- Insurance IDs
+- Medical data
+
+Custom Data Identifiers:
+- Define your own patterns
+- Company-specific sensitive data
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                            SUMMARY & EXAM TIPS
+═══════════════════════════════════════════════════════════════════════════════
+
+### Quick Reference:
+
+```
+SERVICE/FEATURE                    KEY POINT
+────────────────────────────────────────────────────────────────────────────
+Encryption in Flight         →    TLS/SSL, prevents MITM
+Server-side Encryption      →    Encrypted at rest, key on server
+Client-side Encryption      →    Encrypted before sending, end-to-end
+KMS                         →    Managed keys, integrated with services
+Symmetric Keys              →    AES-256, same key for encrypt/decrypt
+Asymmetric Keys             →    Public/Private pair, for external use
+Multi-Region Keys           →    Same key across regions, same key ID
+SSM Parameter Store         →    Configuration & secrets, hierarchical
+Secrets Manager             →    Secrets with rotation, RDS integration
+ACM                         →    TLS certificates, free, auto-renewal
+WAF                         →    Layer 7 protection, Web ACL rules
+Shield Standard             →    Free DDoS protection, Layer 3/4
+Shield Advanced             →    $3K/month, DRT support, Layer 7
+Firewall Manager            →    Centralized rules across Organization
+GuardDuty                   →    Threat detection, ML-based
+Inspector                   →    Vulnerability assessment, EC2/ECR/Lambda
+Macie                       →    Sensitive data discovery in S3 (PII)
+```
+
+### Exam Tips:
+
+```
+✓ KMS keys are REGIONAL (except Multi-Region Keys)
+✓ Multi-Region Keys have same key ID across regions
+✓ ACM certificates for CloudFront must be in us-east-1
+✓ WAF does NOT work with NLB (use Global Accelerator + ALB)
+✓ Shield Standard is FREE and automatic
+✓ Secrets Manager has AUTOMATIC rotation (vs Parameter Store)
+✓ GuardDuty uses CloudTrail, VPC Flow Logs, DNS Logs
+✓ Inspector = vulnerability scanning (EC2, ECR, Lambda)
+✓ Macie = sensitive data in S3 (PII)
+✓ Firewall Manager = org-wide security policies
+```
+
+═══════════════════════════════════════════════════════════════════════════════
+                                  END OF GUIDE
+═══════════════════════════════════════════════════════════════════════════════
